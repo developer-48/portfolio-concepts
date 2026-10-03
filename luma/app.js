@@ -1,8 +1,81 @@
 (() => {
-let temperature=2700,finish='Орех',on=true;const range=document.getElementById('brightness');const power=document.getElementById('power');const classes={'Орех':'walnut','Чёрный дуб':'oak','Светлый ясень':'ash'};
-function sync(){const value=Number(range.value);document.documentElement.style.setProperty('--light-brightness',on?String(.4+value*.0068):'.22');document.documentElement.style.setProperty('--light-hue',temperature===2700?'0deg':temperature===3500?'11deg':'20deg');document.documentElement.style.setProperty('--light-saturation',temperature===2700?'1':temperature===3500?'.72':'.38');document.getElementById('brightness-value').textContent=value+'%';document.getElementById('scene-label').textContent=on?(temperature===2700?'Тёплый':temperature===3500?'Мягкий':'Нейтральный')+' свет · '+temperature+' K · '+value+'%':'Свет выключен';power.setAttribute('aria-pressed',String(on));power.firstChild.textContent=on?'Свет включён ':'Включить свет ';document.getElementById('selected-finish').textContent='Основание: '+finish.toLowerCase();document.getElementById('finish-sample').className='finish-sample '+classes[finish];document.getElementById('selection-finish').value=finish;document.getElementById('selection-temp').value=temperature+' K';document.getElementById('selection-brightness').value=value+'%';document.getElementById('selection-summary').textContent='AMBER 01 · '+finish+' · '+temperature+' K · яркость '+value+'%.';}
-range.addEventListener('input',sync);power.addEventListener('click',()=>{on=!on;sync();});document.querySelectorAll('[data-temperature]').forEach(button=>button.addEventListener('click',()=>{temperature=Number(button.dataset.temperature);document.querySelectorAll('[data-temperature]').forEach(x=>x.setAttribute('aria-pressed',String(x===button)));sync();}));document.querySelectorAll('[data-finish]').forEach(button=>button.addEventListener('click',()=>{finish=button.dataset.finish;document.querySelectorAll('[data-finish]').forEach(x=>x.setAttribute('aria-pressed',String(x===button)));sync();}));
-const products={amber:{name:'AMBER 01',copy:'Настольный объект из стекла и дерева. Мягкое свечение остаётся внутри объёма и создаёт спокойный локальный свет.',specs:{'Тип':'Настольный','Материалы':'Стекло / дерево','Габариты концепта':'Ø 180 × 300 мм','Свет':'2700–4000 K'}},line:{name:'LINE 02',copy:'Тонкая горизонтальная линия над столом. Подвесной светильник оставляет пространство открытым и собирает свет там, где он нужен.',specs:{'Тип':'Подвесной','Материалы':'Алюминий / рассеиватель','Габариты концепта':'1200 × 35 мм','Свет':'Линейный, направленный'}},arc:{name:'ARC 03',copy:'Напольный светильник для тихого уголка. Простая форма, выразительная фактура абажура и свет для вечернего чтения.',specs:{'Тип':'Напольный','Материалы':'Металл / ткань','Высота концепта':'1450 мм','Свет':'Мягкий, рассеянный'}}};
-document.querySelectorAll('[data-product]').forEach(button=>button.addEventListener('click',()=>{const p=products[button.dataset.product];document.getElementById('product-title').textContent=p.name;document.getElementById('product-description').textContent=p.copy;const dl=document.getElementById('product-specs');dl.replaceChildren();Object.entries(p.specs).forEach(([key,value])=>{const div=document.createElement('div'),dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=key;dd.textContent=value;div.append(dt,dd);dl.append(div);});document.getElementById('product-detail').showModal();}));document.getElementById('detail-config').addEventListener('click',()=>document.getElementById('product-detail').close());sync();
-if(window.gsap&&!matchMedia('(prefers-reduced-motion: reduce)').matches){gsap.from('.lamp-cutout',{rotation:2,y:35,opacity:0,duration:1.2,ease:'power3.out'});gsap.to('.lamp-cutout',{rotation:2,y:35,ease:'none',scrollTrigger:{trigger:'.hero',start:'top top',end:'bottom top',scrub:1}});gsap.from('.glass-study img',{rotation:8,y:45,ease:'none',scrollTrigger:{trigger:'.glass-study',start:'top bottom',end:'bottom top',scrub:1}});}
+  let temperature = 2700;
+  let finish = 'Орех';
+  let on = true;
+  const range = document.getElementById('brightness');
+  const power = document.getElementById('power');
+  const classes = {'Орех': 'walnut', 'Чёрный дуб': 'oak', 'Светлый ясень': 'ash'};
+  const labels = {2700: 'Тёплый', 3500: 'Мягкий', 4000: 'Нейтральный'};
+  const setText = (id, value) => {document.getElementById(id).textContent = value;};
+
+  function sync() {
+    const value = Number(range.value);
+    const root = document.documentElement.style;
+    root.setProperty('--light-brightness', on ? String(.4 + value * .0068) : '.22');
+    root.setProperty('--light-hue', temperature === 2700 ? '0deg' : temperature === 3500 ? '11deg' : '20deg');
+    root.setProperty('--light-saturation', temperature === 2700 ? '1' : temperature === 3500 ? '.72' : '.38');
+    setText('brightness-value', value + '%');
+    setText('scene-label', on ? labels[temperature] + ' свет · ' + temperature + ' K · ' + value + '%' : 'Свет выключен');
+    setText('power-label', on ? 'Свет включён' : 'Свет выключен');
+    power.setAttribute('aria-pressed', String(on));
+    power.setAttribute('aria-label', on ? 'Выключить свет' : 'Включить свет');
+    setText('selected-finish', 'Основание: ' + finish.toLowerCase());
+    document.getElementById('finish-sample').className = 'finish-sample ' + classes[finish];
+    document.getElementById('selection-finish').value = finish;
+    document.getElementById('selection-temp').value = temperature + ' K';
+    document.getElementById('selection-brightness').value = value + '%';
+    document.getElementById('selection-power').value = on ? 'Включён' : 'Выключен';
+    setText('selection-summary', 'AMBER 01 · ' + finish + ' · ' + temperature + ' K · яркость ' + value + '% · свет ' + (on ? 'включён' : 'выключен') + '.');
+  }
+
+  range.addEventListener('input', sync);
+  power.addEventListener('click', () => {on = !on; sync();});
+  document.querySelectorAll('[data-temperature]').forEach(button => button.addEventListener('click', () => {
+    temperature = Number(button.dataset.temperature);
+    document.querySelectorAll('[data-temperature]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+    sync();
+  }));
+  document.querySelectorAll('[data-finish]').forEach(button => button.addEventListener('click', () => {
+    finish = button.dataset.finish;
+    document.querySelectorAll('[data-finish]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+    sync();
+  }));
+
+  const products = {
+    amber: {name: 'AMBER 01', image: '../assets/luma.webp', copy: 'Стеклянный объём на деревянном основании. Мягкий локальный свет для прикроватной тумбы, полки или небольшого столика.', specs: {'Тип': 'Настольный', 'Материалы': 'Стекло / дерево', 'Размер концепта': 'Ø 180 × 300 мм', 'Свет': '2700–4000 K'}},
+    line: {name: 'LINE 02', image: '../assets/luma-line.webp', copy: 'Тонкая линия света над обеденным столом. Подвес подчёркивает горизонталь и оставляет пространство открытым.', specs: {'Тип': 'Подвесной', 'Материалы': 'Алюминий / рассеиватель', 'Размер концепта': '1200 × 35 мм', 'Свет': 'Направленный'}},
+    arc: {name: 'ARC 03', image: '../assets/luma-arc.webp', copy: 'Напольный светильник рядом с креслом. Тканевый абажур смягчает свет и создаёт спокойный уголок для вечернего чтения.', specs: {'Тип': 'Напольный', 'Материалы': 'Металл / ткань', 'Высота концепта': '1450 мм', 'Свет': 'Рассеянный'}}
+  };
+  const dialog = document.getElementById('product-detail');
+  document.querySelectorAll('[data-product]').forEach(button => button.addEventListener('click', () => {
+    const product = products[button.dataset.product];
+    const image = document.getElementById('product-image');
+    image.src = product.image;
+    image.alt = product.name + ' в интерьере';
+    setText('product-title', product.name);
+    setText('product-description', product.copy);
+    const specs = document.getElementById('product-specs');
+    specs.replaceChildren();
+    Object.entries(product.specs).forEach(([key, value]) => {
+      const row = document.createElement('div');
+      const term = document.createElement('dt');
+      const description = document.createElement('dd');
+      term.textContent = key;
+      description.textContent = value;
+      row.append(term, description);
+      specs.append(row);
+    });
+    dialog.showModal();
+  }));
+  document.getElementById('detail-config').addEventListener('click', () => dialog.close());
+  sync();
+
+  if (window.gsap && window.ScrollTrigger) {
+    gsap.matchMedia().add('(prefers-reduced-motion: no-preference)', () => {
+      gsap.fromTo('.l-hero-photo', {scale: 1.035}, {scale: 1.09, ease: 'none', scrollTrigger: {trigger: '.l-hero', start: 'top top', end: 'bottom top', scrub: 1}});
+      document.querySelectorAll('.l-model-photo').forEach(frame => {
+        gsap.fromTo(frame.querySelector('img'), {scale: 1.06, yPercent: -2}, {scale: 1.06, yPercent: 2, ease: 'none', scrollTrigger: {trigger: frame, start: 'top bottom', end: 'bottom top', scrub: 1}});
+      });
+    });
+  }
 })();

@@ -93,9 +93,13 @@
 - Manrope: SIL Open Font License, текст в `licenses/Manrope-OFL.txt`.
 - Cormorant Garamond: SIL Open Font License, текст в `licenses/CormorantGaramond-OFL.txt`.
 - GSAP и ScrollTrigger 3.13.0: сохранены заголовки авторства и [Standard License](https://gsap.com/standard-license/).
-- Three 0.180.0: MIT, текст в `licenses/Three-LICENSE.txt`.
+- Onest Variable 5.3.1: SIL Open Font License, текст в `licenses/Onest-OFL.txt`. Используется в портфолио и FORMA.
+- Golos Text Variable 5.3.0: SIL Open Font License, текст в `licenses/Golos-OFL.txt`. Используется в LUMA.
+- Lucide Static 1.51.0: ISC, текст в `licenses/Lucide-LICENSE.txt`. SVG-иконки собраны в локальный спрайт `shared/icons.svg`.
 
 ## Визуальные ориентиры
 
 Основной ориентир по читаемости, формам и многослойной композиции — [39 Donuts](https://developer-48.github.io/39donuts-franchise-concept-demo/). Дополнительно изучались страницы [Coffee Supreme](https://coffeesupreme.com/), [Dayglow](https://dayglow.coffee/), [Fellow](https://fellowproducts.com/) и [Audo Copenhagen](https://audocph.com/). Их изображения и готовые макеты в исходники не включены.
 
+
+Для новой версии портфолио изучены официальные страницы [Rauno Freiberg](https://rauno.me/), [Brittany Chiang](https://brittanychiang.com/) и [Lusion](https://lusion.co/): ясная роль автора, крупная подача работ и интерактивное движение. Готовые композиции, тексты и ресурсы этих сайтов не копировались.
