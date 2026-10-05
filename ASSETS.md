@@ -2,7 +2,7 @@
 
 ## Собственные изображения
 
-Все десять изображений созданы через встроенный ImageGen в режиме генерации по текстовому описанию. Для четырёх предметных изображений MORI и LUMA включён прозрачный фон. Применена только оптимизация размера и формата WebP. Предметы и архитектура вымышлены.
+Все четырнадцать исходных изображений созданы через встроенный ImageGen в режиме генерации по текстовому описанию. Для четырёх предметных изображений MORI и LUMA включён прозрачный фон. Применена только оптимизация размера и формата WebP. Предметы, архитектура и интерьер кофейни вымышлены. Четыре новых изображения добавлены 5 октября 2026 года.
 
 ### forma
 
@@ -83,6 +83,38 @@
 Промпт:
 
 > Use case: product-mockup. A premium interior design campaign photograph. A beautiful sculptural slender brushed bronze floor lamp with a warm cream linen conical shade, next to an exquisite soft curved lounge chair in a refined architectural interior. Dark blue gray plaster wall, walnut floor, one soft pool of warm light, lamp shown fully from base to shade. Physically plausible proportions, premium cinematic interior design photography, elegant restrained composition with rich materials. No people, no text, no logo, no watermark. Landscape composition.
+
+### mori-interior
+
+Сохранённый файл: `assets/mori-interior.webp`. Встроенный ImageGen, генерация по тексту, непрозрачный фон. Исходный PNG сохранён отдельно; для сайта выполнена конвертация в WebP с качеством 90.
+
+Промпт:
+
+> Use case: photorealistic-natural. Asset type: full-width atmospheric interior photograph for the fictional MORI coffee shop website. Primary request: a beautiful intimate contemporary neighborhood cafe interior, curved warm cream plaster counter, tactile plum upholstered bench, small terracotta tables and light oak chairs, a subtle coral accent, professional espresso machine and ceramic cups at the counter, lush botanical shadows, warm morning sun through large windows. Carefully art-directed magazine photography, welcoming and quietly premium, convincing physical proportions and finely detailed real materials. Wide landscape view at eye level, calm composition suitable for a large editorial website section. No people, no text, no signage, no logos, no watermark.
+
+### forma-terrace
+
+Сохранённый файл: `assets/forma-terrace.webp`. Встроенный ImageGen, генерация по тексту, непрозрачный фон. Исходный PNG сохранён отдельно; для сайта выполнена конвертация в WebP с качеством 90.
+
+Промпт:
+
+> Use case: photorealistic-natural. Asset type: large architecture detail photograph for the fictional FORMA architectural studio website. Primary request: an elegant covered terrace at a single-story concrete and glass forest house, pale travertine floor, timber slatted ceiling, wide sliding glass wall opening onto a quiet interior, refined low outdoor chairs, a small stone table, pine woodland surrounding the house. Afternoon sunlight and beautifully precise architectural shadows, warm neutral palette, real tactile wood and stone, high-end architectural editorial photography. Landscape composition framed from under the terrace toward the forest, no people, no words, no logos, no watermark. Structurally credible details, no impossible cantilevers.
+
+### forma-stone
+
+Сохранённый файл: `assets/forma-stone.webp`. Встроенный ImageGen, генерация по тексту, непрозрачный фон. Исходный PNG сохранён отдельно; для сайта выполнена конвертация в WebP с качеством 90.
+
+Промпт:
+
+> Use case: texture-pattern. Asset type: photorealistic material photograph for a minimal architectural studio website. Full-frame close-up of pale warm beige travertine stone, subtle natural mineral layering, delicate pores and very gentle irregular ivory veins. Perfectly front-on orthographic surface, softly lit with natural grazing light, refined high-end architectural material sample photography. Entire frame only one continuous real stone surface, warm neutral colors, no tiles, no grid, no objects, no words, no logos, no watermark, no harsh dark cracks. Natural and tactile, quiet and sophisticated.
+
+### forma-wood
+
+Сохранённый файл: `assets/forma-wood.webp`. Встроенный ImageGen, генерация по тексту, непрозрачный фон. Исходный PNG сохранён отдельно; для сайта выполнена конвертация в WebP с качеством 90.
+
+Промпт:
+
+> Use case: texture-pattern. Asset type: photorealistic material photograph for a minimal architectural studio website. Full-frame close-up of one beautiful broad light oak wood surface, warm honey and taupe color, naturally flowing vertical grain, delicate pores and subtle tonal variation. Perfectly front-on orthographic surface, softly lit with natural grazing light, refined high-end architectural material sample photography. Entire frame only one continuous oak surface, no planks, no joints, no grid, no objects, no words, no logos, no watermark, no harsh knots. Natural and tactile, quiet and sophisticated.
 
 ## Превью
 
