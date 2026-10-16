@@ -7,8 +7,7 @@
   document.addEventListener('keydown', event => { if (event.key === 'Escape') closeMenu(); });
   const projects = {
     kf21: { title: 'KF21', url: 'https://kf21.ru/', caption: 'Сайт образовательного проекта · Разработка с нуля по макету', description: 'Публичный лендинг образовательного проекта. Реализовал сайт с нуля по предоставленному макету.', role: 'Выполнил фронтенд-реализацию всего лендинга, адаптивную вёрстку и собственные визуальные доработки.', status: 'Показан публичный лендинг. Опыт работы над личными кабинетами описан отдельно.' },
-    donuts: { title: '39 Donuts', url: 'https://developer-48.github.io/39donuts-franchise-concept-demo/', caption: 'Редизайн сайта франшизы · Дизайн и разработка', description: 'Самостоятельный редизайн рекламного сайта франшизы: структура, визуальная концепция и реализация.', role: 'Полностью разработал новый дизайн и сайт без участия других дизайнеров и разработчиков.', status: 'Здесь доступна демонстрация редизайна.' },
-    mori: { title: 'MORI', url: '../mori/', caption: 'Личный концепт кофейни · Дизайн и разработка', description: 'Вымышленная кофейня с интерактивным меню. Самостоятельный концепт для портфолио.', role: 'Разработал дизайн и сайт: фильтры меню, настройка напитков, пересчёт цены и выбор рецепта.', status: 'Личная работа. Настоящие заказы и платежи не принимаются.' }
+    donuts: { title: '39 Donuts', url: 'https://developer-48.github.io/39donuts-franchise-concept-demo/', caption: 'Редизайн сайта франшизы · Дизайн и разработка', description: 'Самостоятельный редизайн рекламного сайта франшизы: структура, визуальная концепция и реализация.', role: 'Полностью разработал новый дизайн и сайт без участия других дизайнеров и разработчиков.', status: 'Здесь доступна демонстрация редизайна.' }
   };
   document.querySelectorAll('[data-showcase]').forEach(button => button.addEventListener('click', () => {
     const key = button.dataset.showcase, project = projects[key];
@@ -17,7 +16,6 @@
     document.getElementById('showcase-link').href = project.url;
     document.getElementById('showcase-link').setAttribute('aria-label', 'Открыть ' + project.title);
     document.getElementById('showcase-caption').textContent = project.caption;
-    document.querySelector('.showcase-stage').style.background = key === 'mori' ? '#fffdf4' : '#fff';
   }));
   const dialog = document.getElementById('case-dialog');
   document.querySelectorAll('[data-case]').forEach(button => button.addEventListener('click', () => {
