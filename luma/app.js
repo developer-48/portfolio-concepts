@@ -15,6 +15,8 @@
     root.setProperty('--light-hue', temperature === 2700 ? '0deg' : temperature === 3500 ? '11deg' : '20deg');
     root.setProperty('--light-saturation', temperature === 2700 ? '1' : temperature === 3500 ? '.72' : '.38');
     setText('brightness-value', value + '%');
+    const presets={evening:[2700,35],reading:[3500,85],background:[2700,20]};
+    document.querySelectorAll('[data-light-preset]').forEach(button=>{const preset=presets[button.dataset.lightPreset];button.setAttribute('aria-pressed',String(on&&temperature===preset[0]&&value===preset[1]));});
     setText('scene-label', on ? labels[temperature] + ' свет · ' + temperature + ' K · ' + value + '%' : 'Свет выключен');
     setText('power-label', on ? 'Свет включён' : 'Свет выключен');
     power.setAttribute('aria-pressed', String(on));
@@ -28,6 +30,7 @@
     setText('selection-summary', 'AMBER 01 · ' + finish + ' · ' + temperature + ' K · яркость ' + value + '% · свет ' + (on ? 'включён' : 'выключен') + '.');
   }
 
+  document.querySelectorAll('[data-light-preset]').forEach(button=>button.addEventListener('click',()=>{const presets={evening:[2700,35],reading:[3500,85],background:[2700,20]};const selected=presets[button.dataset.lightPreset];temperature=selected[0];range.value=selected[1];on=true;document.querySelectorAll('[data-temperature]').forEach(item=>item.setAttribute('aria-pressed',String(Number(item.dataset.temperature)===temperature)));sync();}));
   range.addEventListener('input', sync);
   power.addEventListener('click', () => {on = !on; sync();});
   document.querySelectorAll('[data-temperature]').forEach(button => button.addEventListener('click', () => {
@@ -54,6 +57,11 @@
     image.alt = product.name + ' в интерьере';
     setText('product-title', product.name);
     setText('product-description', product.copy);
+    const guidance={amber:'Подходит для локального светового акцента. Сравните размеры основания с поверхностью тумбы или полки; оставьте место для книги и повседневных вещей.',line:'Положение подвеса определяется вместе с положением стола. Для реальной установки заранее уточняют вывод питания, крепление и высоту подвеса.',arc:'Отдельный источник рядом с зоной отдыха. Перед размещением стоит проверить место для основания и свободный проход вокруг кресла.'};
+    setText('product-use',guidance[button.dataset.product]);
+    const next=document.getElementById('detail-config');
+    next.href=button.dataset.product==='amber'?'#configure':'#compare';
+    next.innerHTML='<svg class="icon" aria-hidden="true"><use href="../shared/icons.svg#'+(button.dataset.product==='amber'?'sliders-horizontal':'layers')+'"></use></svg>'+(button.dataset.product==='amber'?'Настроить AMBER':'Сравнить модели');
     const specs = document.getElementById('product-specs');
     specs.replaceChildren();
     Object.entries(product.specs).forEach(([key, value]) => {

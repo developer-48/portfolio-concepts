@@ -16,7 +16,7 @@
   document.querySelectorAll('[data-brief-form]').forEach(form=>{
     let fileUrl;
     form.addEventListener('submit',event=>{
-      event.preventDefault();const data=new FormData(form);const content=[document.title,'Демонстрационный бриф. Никуда не отправлен.','',...Array.from(data,([key,value])=>key+': '+value)].join('\n');
+      event.preventDefault();const data=new FormData(form);const content=[document.title,'Локальная копия из авторского концепта. Данные никуда не отправлены.','',...Array.from(data,([key,value])=>key+': '+value)].join('\n');
       if(fileUrl)URL.revokeObjectURL(fileUrl);fileUrl=URL.createObjectURL(new Blob([content],{type:'text/plain;charset=utf-8'}));
       const feedback=form.querySelector('.feedback');feedback.textContent='Файл подготовлен. Данные остаются на вашем устройстве. ';const link=document.createElement('a');link.href=fileUrl;link.download=form.dataset.downloadFile||'concept-brief.txt';link.textContent='Скачать файл';link.style.textDecoration='underline';feedback.append(link);link.click();
     });
