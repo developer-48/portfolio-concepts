@@ -29,7 +29,7 @@
   }
   async function load(){
     if(loading||unavailable)return;
-    loading=import('./vehicle-renderer.js?v=8').then(({createVehicleScene})=>{
+    loading=import('./vehicle-renderer.js?v=9').then(({createVehicleScene})=>{
       engine=createVehicleScene(stage,images,status);
       engine.setVisible(visible);
       if(current)return engine.update(current);
