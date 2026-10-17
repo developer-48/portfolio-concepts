@@ -62,4 +62,3 @@ Final generated originals:
 - Sedan, crossover, SUV: resized to 1200 × 800 WebP with alpha.
 
 Pillow was used only for size and format conversion. Production preview `portfolio/assets/atlas.webp` is a browser screenshot of the resulting ATLAS hero.
-
