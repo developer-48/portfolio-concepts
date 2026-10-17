@@ -3,15 +3,15 @@
   const money = value => new Intl.NumberFormat('ru-RU').format(value) + ' ₽';
   const icon = Studio.icon;
   const services = {
-    film: {title:'Защита, которая остаётся незаметной.',text:'Плёнка на участках, которые первыми встречают дорогу. Подготовка, точная посадка на геометрию детали и аккуратная обработка краёв.',image:'atlas-hero',caption:'01 / Защита кузова',items:['Подбор зон и материала','Очистка и подготовка поверхности','Оклейка и контроль прилегания'],price:85000,time:'3–4 дня',href:'protection.html'},
-    polish: {title:'Глубина цвета. Чистота отражений.',text:'Перед коррекцией оценивают лак и характер дефектов. Подход и интенсивность работы подбираются для конкретной поверхности.',image:'atlas-process',caption:'02 / Восстановление блеска',items:['Оценка состояния лакокрасочного покрытия','Согласование степени коррекции','Финишная обработка и контроль света'],price:24000,time:'1–2 дня',href:'paint.html'},
-    coating: {title:'Последний штрих имеет значение.',text:'Защитный состав наносят на подготовленную поверхность. Он дополняет уход за кузовом и помогает сохранить аккуратный внешний вид.',image:'atlas-hero',caption:'03 / Защитные составы',items:['Подготовка поверхности перед нанесением','Выбор состава под задачу','Выдержка и рекомендации по уходу'],price:14000,time:'от 1 дня',href:'paint.html'},
-    interior: {title:'Приятно снова оказаться внутри.',text:'Деликатный уход за материалами, к которым вы прикасаетесь каждый день. Салон разбирают на зоны, а не обрабатывают одним универсальным средством.',image:'atlas-interior',caption:'04 / Уход за интерьером',items:['Оценка материалов и загрязнений','Очистка кожи, текстиля и пластика','Сушка и проверка труднодоступных зон'],price:11000,time:'1–2 дня',href:'interior.html'}
+    film: {title:'Защита, которая остаётся незаметной.',text:'Плёнка на участках, которые первыми встречают дорогу. Подготовка, точная посадка на геометрию детали и аккуратная обработка краёв.',image:'../assets/atlas-v7/hero.webp',caption:'01 / Защита кузова',items:['Подбор зон и материала','Очистка и подготовка поверхности','Оклейка и контроль прилегания'],price:85000,time:'3–4 дня',href:'protection.html'},
+    polish: {title:'Глубина цвета. Чистота отражений.',text:'Перед коррекцией оценивают лак и характер дефектов. Подход и интенсивность работы подбираются для конкретной поверхности.',image:'../assets/v6/atlas-process.webp',caption:'02 / Восстановление блеска',items:['Оценка состояния лакокрасочного покрытия','Согласование степени коррекции','Финишная обработка и контроль света'],price:24000,time:'1–2 дня',href:'paint.html'},
+    coating: {title:'Последний штрих имеет значение.',text:'Защитный состав наносят на подготовленную поверхность. Он дополняет уход за кузовом и помогает сохранить аккуратный внешний вид.',image:'../assets/atlas-v7/hero.webp',caption:'03 / Защитные составы',items:['Подготовка поверхности перед нанесением','Выбор состава под задачу','Выдержка и рекомендации по уходу'],price:14000,time:'от 1 дня',href:'paint.html'},
+    interior: {title:'Приятно снова оказаться внутри.',text:'Деликатный уход за материалами, к которым вы прикасаетесь каждый день. Салон разбирают на зоны, а не обрабатывают одним универсальным средством.',image:'../assets/v6/atlas-interior.webp',caption:'04 / Уход за интерьером',items:['Оценка материалов и загрязнений','Очистка кожи, текстиля и пластика','Сушка и проверка труднодоступных зон'],price:11000,time:'1–2 дня',href:'interior.html'}
   };
   function renderService(key){
     const item=services[key]; if(!item||!$('#a-service-panel'))return;
     document.querySelectorAll('[data-service]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.service===key)));
-    $('#a-service-panel').innerHTML=`<div class="service-image"><img src="../assets/v6/${item.image}.webp" alt="${item.caption.split(' / ')[1]}" width="1536" height="1024"><span>${item.caption}</span></div><div class="service-description"><h3>${item.title}</h3><p>${item.text}</p><ul>${item.items.map(text=>`<li>${icon('check')}${text}</li>`).join('')}</ul><div class="service-facts"><div><small>Демонстрационная цена</small><b>от ${money(item.price)}</b></div><div><small>Ориентир по времени</small><b>${item.time}</b></div></div><a class="a-button secondary" href="${item.href}">Разобраться в услуге<span>${icon('layers')}</span></a></div>`;
+    $('#a-service-panel').innerHTML=`<div class="service-image"><img src="${item.image}" alt="${item.caption.split(' / ')[1]}" width="1536" height="1024"><span>${item.caption}</span></div><div class="service-description"><h3>${item.title}</h3><p>${item.text}</p><ul>${item.items.map(text=>`<li>${icon('check')}${text}</li>`).join('')}</ul><div class="service-facts"><div><small>Демонстрационная цена</small><b>от ${money(item.price)}</b></div><div><small>Ориентир по времени</small><b>${item.time}</b></div></div><a class="a-button secondary" href="${item.href}">Разобраться в услуге<span>${icon('layers')}</span></a></div>`;
     window.ScrollTrigger?.refresh();
   }
   document.querySelectorAll('[data-service]').forEach(button=>button.addEventListener('click',()=>renderService(button.dataset.service)));
@@ -36,11 +36,12 @@
     protect:{title:'Защита спереди',price:85000,time:'3–4 дня',items:['Очистка и подготовка поверхности','Плёнка: капот, бампер, передние крылья','Оклейка зеркал и контроль краёв']}
   };
   const extras={glass:{title:'Уход за стёклами',price:3500},wheels:{title:'Уход за дисками',price:6000},interior:{title:'Глубокий уход за салоном',price:12000}};
-  const classNames={'1':'Купе / седан','1.2':'Кроссовер','1.4':'Большой SUV'};
+  const vehicleClasses={coupe:{name:'Купе',factor:1},sedan:{name:'Седан',factor:1},crossover:{name:'Кроссовер',factor:1.2},suv:{name:'Большой SUV',factor:1.4}};
   let configuration;
   function calculate(){
     const key=$('input[name="package"]:checked').value;
-    const factor=Number($('input[name="car-class"]:checked').value);
+    const vehicle=$('input[name="car-class"]:checked').value;
+    const {factor,name:className}=vehicleClasses[vehicle];
     const pack=packages[key];
     const interior=$('input[name="extra"][value="interior"]');
     interior.disabled=key==='refresh';
@@ -50,25 +51,27 @@
     const chosen=[...document.querySelectorAll('input[name="extra"]:checked')].map(input=>extras[input.value]);
     const base=Math.round(pack.price*factor);
     const total=base+chosen.reduce((sum,item)=>sum+Math.round(item.price*factor),0);
-    configuration={key,pack,factor,chosen,base,total,className:classNames[String(factor)]};
+    configuration={key,pack,factor,chosen,base,total,className};
     $('#configuration-result').dataset.package=key;
     $('#package-title').textContent=pack.title;
     $('#package-included').innerHTML=pack.items.map(text=>`<li>${icon('check')}${text}</li>`).join('');
     $('#estimate-price').textContent='от '+money(total);
+    $('#mobile-estimate-price').textContent='от '+money(total);
     $('#estimate-duration').textContent='Программа: '+pack.time+(chosen.length?' · дополнения могут увеличить срок':'');
     $('#estimate-breakdown').innerHTML=`<div><span>${pack.title}</span><span>${money(base)}</span></div>`+chosen.map(item=>`<div><span>${item.title}</span><span>${money(Math.round(item.price*factor))}</span></div>`).join('');
+    window.AtlasShowroom?.update({vehicle,key,extras:[...document.querySelectorAll('input[name="extra"]:checked')].map(input=>input.value)});
   }
   document.querySelectorAll('.configure-options input').forEach(input=>input.addEventListener('change',calculate));
   function selectPackage(key){if(!packages[key])return;$(`input[name="package"][value="${key}"]`).checked=true;calculate();}
   document.querySelectorAll('[data-package-link]').forEach(link=>link.addEventListener('click',()=>selectPackage(link.dataset.packageLink)));
   calculate(); selectPackage(new URLSearchParams(location.search).get('package'));
   const brief=$('#a-brief');
-  $('#open-brief').addEventListener('click',()=>{
+  document.querySelectorAll('[data-save-brief]').forEach(button=>button.addEventListener('click',()=>{
     const c=configuration;
     $('#brief-estimate').innerHTML=`${c.className} · ${c.pack.title}<b>от ${money(c.total)}</b>Ориентир: ${c.pack.time}${c.chosen.length?' без учёта времени на дополнения':''}`;
     $('#brief-error').textContent='';$('#brief-success').textContent='';
     brief.showModal();
-  });
+  }));
   $('#a-brief-form').addEventListener('submit',event=>{
     event.preventDefault();
     const model=$('#car-model'),year=$('#car-year');
