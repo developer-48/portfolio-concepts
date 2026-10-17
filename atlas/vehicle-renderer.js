@@ -1,7 +1,7 @@
 import * as THREE from '../shared/three/three.module.min.js';
 import {GLTFLoader} from '../shared/three/GLTFLoader.js';
 import {MeshoptDecoder} from '../shared/three/meshopt_decoder.module.js';
-import {RoomEnvironment} from '../shared/three/RoomEnvironment.js';
+import {requestModel} from './model-data.js?v=13';
 
 const models={
   coupe:{file:'coupe',name:'Porsche 911 GT3 RS',height:1.43,cabin:[.12,1.10,.62],look:[-.15,.66,-.55]},
@@ -18,17 +18,30 @@ export function createVehicleScene(stage,_images,onStatus){
   const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
   renderer.setClearColor(0x101a24,0);
   renderer.toneMapping=THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure=.88;
+  renderer.toneMappingExposure=1.05;
+  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.shadowMap.autoUpdate=false;
   const canvas=renderer.domElement;canvas.className='vehicle-canvas';canvas.setAttribute('aria-hidden','true');host.append(canvas);
   const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(34,1,.025,60);
   const target=new THREE.Vector3();
-  const pmrem=new THREE.PMREMGenerator(renderer),room=new RoomEnvironment();
-  const environment=pmrem.fromScene(room,.04);scene.environment=environment.texture;scene.environmentIntensity=.9;
-  room.dispose();pmrem.dispose();
-  const ambient=new THREE.HemisphereLight(0xe2f3ff,0x25322e,1.6);scene.add(ambient);
-  const keyLight=new THREE.DirectionalLight(0xfff4e7,2.2);keyLight.position.set(3,5,4);scene.add(keyLight);
-  const edgeLight=new THREE.DirectionalLight(0xb6d8ef,1.5);edgeLight.position.set(-3,2,-4);scene.add(edgeLight);
+  // Softboxes form long reflections across the paint; no remote HDR download.
+  const studio=new THREE.Scene();studio.background=new THREE.Color(.055,.064,.075);
+  const panelGeometry=new THREE.PlaneGeometry(1,1),panelMaterials=[];
+  function softbox(x,y,z,w,h,power,color=0xffffff){
+    const material=new THREE.MeshBasicMaterial({color:new THREE.Color(color).multiplyScalar(power),side:THREE.DoubleSide});panelMaterials.push(material);
+    const panel=new THREE.Mesh(panelGeometry,material);panel.position.set(x,y,z);panel.scale.set(w,h,1);panel.lookAt(0,.8,0);studio.add(panel);
+  }
+  softbox(-3,5,1,1.4,7,4.5);softbox(4,3,-2,.8,7,4.2,0xd5e6f4);
+  softbox(1,5,-5,5,1.1,3.8);softbox(0,1,6,5,2,1.3,0xffeadb);
+  const pmrem=new THREE.PMREMGenerator(renderer),environment=pmrem.fromScene(studio,.035);
+  scene.environment=environment.texture;scene.environmentIntensity=1;
+  panelGeometry.dispose();panelMaterials.forEach(m=>m.dispose());pmrem.dispose();
+  const ambient=new THREE.HemisphereLight(0xdce8f3,0x141b20,.45);scene.add(ambient);
+  const keyLight=new THREE.DirectionalLight(0xfff4e7,2.5);keyLight.position.set(-3,8,3.5);scene.add(keyLight);
+  keyLight.castShadow=true;keyLight.shadow.mapSize.set(1024,1024);Object.assign(keyLight.shadow.camera,{left:-3.6,right:3.6,top:3.6,bottom:-3.6,near:1,far:14});keyLight.shadow.bias=-.00015;keyLight.shadow.normalBias=.018;keyLight.shadow.camera.updateProjectionMatrix();
+  const edgeLight=new THREE.DirectionalLight(0xb6d8ef,.65);edgeLight.position.set(-3,2,-4);scene.add(edgeLight);
   const cabinLight=new THREE.PointLight(0xffedcf,0,3,1.5);cabinLight.position.set(0,1.4,-.4);scene.add(cabinLight);
+  const contact=new THREE.Mesh(new THREE.PlaneGeometry(14,14),new THREE.ShadowMaterial({opacity:.16}));contact.rotation.x=-Math.PI/2;contact.position.y=-.008;contact.receiveShadow=true;scene.add(contact);
+  let shadowDoor=-1;
   const shadowCanvas=document.createElement('canvas');shadowCanvas.width=128;shadowCanvas.height=256;
   const ctx=shadowCanvas.getContext('2d');ctx.setTransform(64,0,0,128,64,128);const gradient=ctx.createRadialGradient(0,0,.08,0,0,1);
   gradient.addColorStop(0,'rgba(0,0,0,.65)');gradient.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=gradient;ctx.fillRect(-1,-1,2,2);
@@ -46,14 +59,15 @@ export function createVehicleScene(stage,_images,onStatus){
 
   function report(label){
     if(label)onStatus({label});
-    onStatus({playing:!!timeline,paused:paused&&!!timeline,progress:timeline?timeline.progress():1});
+    onStatus({playing:!!timeline,paused:paused&&!!timeline,...(!loading?{progress:timeline?timeline.progress():1}:{})});
     const playback=timeline?(paused?'paused':'playing'):'complete';if(stage.dataset.playback!==playback)stage.dataset.playback=playback;
   }
   function applyPose(){
     camera.position.set(pose.x,pose.y,pose.z);target.set(pose.tx,pose.ty,pose.tz);camera.lookAt(target);
     if(camera.fov!==pose.fov){camera.fov=pose.fov;camera.updateProjectionMatrix();}
     if(record){record.left.rotation.y=-pose.door;record.right.rotation.y=pose.door*.72;}
-    cabinLight.intensity=pose.light;const inside=THREE.MathUtils.clamp((pose.fov-43)/29,0,1);scene.environmentIntensity=.9-inside*.55;ambient.intensity=1.6-inside*1.1;keyLight.intensity=2.2-inside*1.5;edgeLight.intensity=1.5-inside;
+    cabinLight.intensity=pose.light;const inside=THREE.MathUtils.clamp((pose.fov-43)/29,0,1);scene.environmentIntensity=1-inside*.55;ambient.intensity=.45-inside*.15;keyLight.intensity=2.5-inside*1.7;edgeLight.intensity=.65-inside*.45;
+    if(Math.abs(shadowDoor-pose.door)>.025){renderer.shadowMap.needsUpdate=true;shadowDoor=pose.door;}
   }
   function draw(now){
     raf=0;if(disposed||lost||!visible||document.hidden)return;
@@ -73,18 +87,30 @@ export function createVehicleScene(stage,_images,onStatus){
   }
   const resizeObserver=new ResizeObserver(resize);resizeObserver.observe(host);
   function decorate(material,surface,vehicle){
+    const name=material.name||'';
     material.forceSinglePass=true;
-    if(surface==='interior'||/leather|fabric|plastic|rubber|carpet|wood|torped/i.test(material.name)){material.metalness=.04;material.roughness=Math.max(.58,material.roughness);}
     if('transmission' in material)material.transmission=0;
-    if(surface==='paint')material=new THREE.MeshPhysicalMaterial({color:vehicle==='coupe'?0x062a1e:0x9aa7ae,metalness:.35,roughness:.38,clearcoat:.55,clearcoatRoughness:.28});
+    if(/plastic|rubber|carpet|fabric|leather|seat|stitch|speakers|torped/i.test(name)||surface==='interior'){
+      material.metalness=0;material.roughness=/rubber|carpet|fabric|seatbelt/i.test(name)?.86:.57;
+      if(!material.map&&/leather|fabric|plastic|seat|torped/i.test(name)){
+        const c=material.color,neutral=Math.max(c.r,c.g,c.b)-Math.min(c.r,c.g,c.b)<.06;
+        if(neutral&&Math.max(c.r,c.g,c.b)>.065)c.multiplyScalar(.22);
+        else if(c.r>c.g*2)c.multiplyScalar(.55);
+      }
+    }else if(/carbon/i.test(name)){material.metalness=.15;material.roughness=.32;}
+    else if(/chrome|metal|rim|wheel/i.test(name)){if(/wheels_chrome|GT3RS_black/i.test(name))material.color.multiplyScalar(.5);material.metalness=.85;material.roughness=Math.max(.22,Math.min(.4,material.roughness));}
+    else if(/light|glass|screen/i.test(name)){material.metalness=.18;material.roughness=Math.max(.12,material.roughness);}
+    else {material.metalness=Math.min(.55,material.metalness);material.roughness=Math.max(.28,material.roughness);}
+    if(surface==='paint')material=new THREE.MeshPhysicalMaterial({color:vehicle==='coupe'?0x06412f:0x87969e,metalness:.38,roughness:.34,clearcoat:1,clearcoatRoughness:.2});
     if(surface==='glass'){
-      material=material.clone();material.color.set(0xa1b4bd);material.transparent=true;material.opacity=.13;material.depthWrite=false;material.roughness=.11;material.metalness=.18;material.forceSinglePass=true;
+      material=material.clone();material.color.set(0x718783);material.transparent=true;material.opacity=.22;material.depthWrite=false;material.roughness=.085;material.metalness=.25;material.forceSinglePass=true;
     }
     const kind={paint:0,interior:2,glass:3,wheels:4}[surface]??5;
     material.onBeforeCompile=shader=>{
       shader.uniforms.atlasProgress=fx.progress;shader.uniforms.atlasStrength=fx.strength;shader.uniforms.atlasMode=fx.mode;
       shader.vertexShader='varying vec3 vAtlasWorld;\n'+shader.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvAtlasWorld=(modelMatrix*vec4(transformed,1.0)).xyz;');
       shader.fragmentShader=`varying vec3 vAtlasWorld;uniform float atlasProgress;uniform float atlasStrength;uniform float atlasMode;\n`+shader.fragmentShader.replace('#include <opaque_fragment>',`
+        ${surface==='glass'?'diffuseColor.a *= mix(.2,1.8,pow(1.0-abs(dot(normal,normalize(vViewPosition))),3.0));':''}
         float scan = mix(-2.5,2.5,atlasProgress);
         float band = 1.0-smoothstep(.015,.16,abs(vAtlasWorld.z-scan));
         float selected = ${kind===0?'1.0-step(1.5,atlasMode)':`1.0-step(.1,abs(atlasMode-${kind}.0))`};
@@ -108,16 +134,17 @@ export function createVehicleScene(stage,_images,onStatus){
     if(cache.has(vehicle)){const item=cache.get(vehicle);cache.delete(vehicle);cache.set(vehicle,item);return item;}
     if(pendingModels.has(vehicle))return pendingModels.get(vehicle);
     const request=(async()=>{
-    const data=await loader.loadAsync(`../assets/atlas-3d/${models[vehicle].file}.glb?v=12`,event=>{
+    const buffer=await requestModel(vehicle,ratio=>{
       if(disposed||current?.vehicle!==vehicle||!loading)return;
-      const ratio=event.total?Math.min(1,event.loaded/event.total):0;
       onStatus({progress:ratio,label:ratio===1?'Готовим объёмную сцену…':ratio?`Загружаем 3D-модель · ${Math.round(ratio*100)}%`:'Загружаем 3D-модель…'});
     });
+    if(disposed)return null;
+    const data=await loader.parseAsync(buffer,'');
     const root=data.scene,materialCache=new Map();root.traverse(o=>{if(!o.isMesh)return;
       const surface=o.userData.surface||o.parent?.userData.surface||'detail';
       const key=o.material.uuid+'|'+surface;
       if(!materialCache.has(key))materialCache.set(key,decorate(o.material,surface,vehicle));
-      o.material=materialCache.get(key);o.frustumCulled=true;
+      o.material=materialCache.get(key);o.frustumCulled=true;o.castShadow=surface!=='glass'&&!o.material.transparent;o.receiveShadow=surface==='interior';
     });
     const item={root,left:root.getObjectByName('DoorLeft'),right:root.getObjectByName('DoorRight')};
     if(disposed){disposeRecord(item);return null;}
@@ -129,8 +156,8 @@ export function createVehicleScene(stage,_images,onStatus){
     try{return await request;}finally{if(pendingModels.get(vehicle)===request)pendingModels.delete(vehicle);}
   }
   function kill(){if(timeline){timeline.kill();timeline=null;}fx.strength.value=0;previousFrame=0;activeExtra=null;}
-  function outside(){const h=models[current.vehicle].height;return{x:5.0,y:2.65,z:5.1,tx:0,ty:h*.46,tz:0,fov:34,door:0,light:0};}
-  function front(){return{...outside(),x:1.25,y:1.8,z:5.5,ty:.65,tz:.45,fov:32};}
+  function outside(){const h=models[current.vehicle].height;return{x:4.8,y:1.8,z:5.5,tx:0,ty:h*.46,tz:0,fov:32,door:0,light:0};}
+  function front(){return{...outside(),x:1.25,y:1.5,z:5.5,ty:.65,tz:.45,fov:32};}
   function entrance(){return{...outside(),x:5.15,y:2.15,z:1.85,ty:models[current.vehicle].height*.57,fov:38,door:1.08,light:1.8};}
   function cabin(){const c=models[current.vehicle];return{x:c.cabin[0],y:c.cabin[1],z:c.cabin[2],tx:c.look[0],ty:c.look[1],tz:c.look[2],fov:72,door:1.08,light:1.2};}
   function restPose(){return current.key==='refresh'?entrance():current.key==='protect'?front():outside();}
@@ -192,14 +219,16 @@ export function createVehicleScene(stage,_images,onStatus){
     }
     kill();queue=[];paused=false;
     if(changedModel){
-      const version=++ticket;loading=true;stage.dataset.loading='true';report('Загружаем 3D-модель…');onStatus({progress:0});
+      const version=++ticket,loadStarted=performance.now();loading=true;stage.dataset.loading='true';report('Загружаем 3D-модель…');onStatus({progress:0});
       try{
         const item=await loadModel(current.vehicle);if(version!==ticket||disposed)return;
-        record?.root.removeFromParent();record=item;scene.add(record.root);
+        record?.root.removeFromParent();record=item;scene.add(record.root);renderer.shadowMap.needsUpdate=true;shadowDoor=-1;
         Object.assign(pose,outside());applyPose();resize();
-        await renderer.compileAsync(scene,camera);
+        const compileStarted=performance.now();await renderer.compileAsync(scene,camera);
+        if(metricsEnabled){stage.dataset.compileMs=String(Math.round(performance.now()-compileStarted));stage.dataset.loadMs=String(Math.round(performance.now()-loadStarted));stage.dataset.readyMs=String(Math.round(performance.now()));}
         if(version!==ticket||disposed)return;
-        loading=false;stage.dataset.loading='false';stage.dataset.renderer='webgl';
+        loading=false;stage.dataset.loading='false';
+        applyPose();renderer.render(scene,camera);stage.dataset.renderer='webgl';
         stage.dataset.model=models[current.vehicle].name;onStatus({unavailable:false,model:models[current.vehicle].name});
         invalidate();play();
       }catch(error){if(version!==ticket||disposed)return;loading=false;stage.dataset.loading='false';stage.dataset.renderer='fallback';onStatus({unavailable:true,label:'3D недоступно · расчёт продолжает работать'});console.warn('ATLAS: model could not load',error);}
@@ -227,5 +256,5 @@ export function createVehicleScene(stage,_images,onStatus){
   stage.addEventListener('keydown',keydown);
   function contextLost(event){event.preventDefault();lost=true;kill();stage.dataset.renderer='fallback';onStatus({unavailable:true,label:'3D недоступно · расчёт продолжает работать'});}
   canvas.addEventListener('webglcontextlost',contextLost);
-  return {update,setVisible,setReduced,toggle,dispose(){disposed=true;ticket++;kill();cancelAnimationFrame(raf);resizeObserver.disconnect();document.removeEventListener('visibilitychange',syncVisibility);stage.removeEventListener('keydown',keydown);cache.forEach(disposeRecord);cache.clear();shadow.geometry.dispose();shadow.material.dispose();shadowTexture.dispose();environment.dispose();renderer.dispose();canvas.remove();}};
+  return {update,setVisible,setReduced,toggle,dispose(){disposed=true;ticket++;kill();cancelAnimationFrame(raf);resizeObserver.disconnect();document.removeEventListener('visibilitychange',syncVisibility);stage.removeEventListener('keydown',keydown);cache.forEach(disposeRecord);cache.clear();shadow.geometry.dispose();shadow.material.dispose();shadowTexture.dispose();contact.geometry.dispose();contact.material.dispose();keyLight.shadow.dispose();environment.dispose();renderer.dispose();canvas.remove();}};
 }

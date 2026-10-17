@@ -8,7 +8,7 @@
   const vehicles={coupe:['Купе','Porsche 911 GT3 RS','01'],sedan:['Седан','Mercedes-Benz S 65','02'],crossover:['Кроссовер','BMW X6 M','03'],suv:['Большой SUV','Mercedes-Benz GLS','04']};
   const descriptions={restore:'Полировка кузова и нанесение защитного состава.',protect:'Плёнка на переднюю часть кузова и зеркала.',refresh:'Деликатная очистка кожи, текстиля и деталей салона.'};
   const names={glass:'Стёкла',wheels:'Диски',interior:'Салон'};
-  let engine,current,loading,visible=false,unavailable=false,lastPlayback='',lastProgress=-1;
+  let engine,current,loading,transport,primed=false,visible=false,unavailable=false,lastPlayback='',lastProgress=-1;
   const playIcon='<path d="m8 5 11 7-11 7V5Z"/>',pauseIcon='<path d="M9 5v14M15 5v14"/>';
   function status(info){
     if(info.unavailable!==undefined)unavailable=info.unavailable;
@@ -26,9 +26,14 @@
     }
     button.hidden=reduce.matches||unavailable;
   }
+  function prepare(){
+    transport??=import('./model-data.js?v=13');
+    if(!primed){const link=document.createElement('link');link.rel='modulepreload';link.href='./vehicle-scene.min.js?v=13';link.fetchPriority='low';document.head.append(link);primed=true;}
+    transport.then(({requestModel})=>requestModel(current?.vehicle||'coupe')).catch(()=>{});
+  }
   async function load(){
     if(loading||unavailable)return;
-    loading=import('./vehicle-renderer.js?v=12.1').then(({createVehicleScene})=>{
+    prepare();loading=import('./vehicle-scene.min.js?v=13').then(({createVehicleScene})=>{
       engine=createVehicleScene(stage,[],status);engine.setVisible(visible);if(current)return engine.update(current);
     }).catch(error=>{stage.dataset.renderer='fallback';status({unavailable:true,label:'3D недоступно · расчёт продолжает работать'});engine?.dispose();engine=null;console.warn('ATLAS: 3D initialization failed',error);});
     return loading;
@@ -43,7 +48,7 @@
     document.getElementById('treatment-description').textContent=descriptions[next.key];
     stage.dataset.vehicle=next.vehicle;stage.dataset.mode=next.key;
     stage.setAttribute('aria-label',`${character}. Интерактивная 3D-модель. Поворот: мышь, палец или клавиши со стрелками. Home — вернуть ракурс. ${descriptions[next.key]}`);
-    if(changedVehicle){fallback.src=`../assets/atlas-v10/${next.vehicle}.webp`;fallback.alt=`${name} · резервная иллюстрация`;}
+    if(changedVehicle){fallback.src=`../assets/atlas-3d/${next.vehicle}-poster.webp?v=13`;fallback.alt=`${character} · студийный вид`;if(primed)prepare();}
     const areas=next.key==='refresh'?[]:['Кузов'];next.extras.forEach(key=>areas.push(names[key]));
     document.getElementById('selected-treatments').textContent='В составе: '+areas.join(' · ');
     if(engine)engine.update(current).catch(()=>{stage.dataset.renderer='fallback';status({unavailable:true});engine?.dispose();engine=null;});else if(visible)load();
@@ -52,5 +57,6 @@
   const observer=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;engine?.setVisible(visible);if(visible)load();},{threshold:.05});observer.observe(stage);
   button.addEventListener('click',()=>engine?.toggle());
   reduce.addEventListener('change',()=>{engine?.setReduced(reduce.matches);status({});});
+  if(!navigator.connection?.saveData){if('requestIdleCallback' in window)requestIdleCallback(prepare,{timeout:1200});else setTimeout(prepare,500);}
   window.AtlasShowroom={update};
 })();
