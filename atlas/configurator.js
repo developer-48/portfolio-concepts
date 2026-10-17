@@ -1,6 +1,7 @@
 (() => {
   const stage=document.getElementById('vehicle-stage');if(!stage)return;
   const images=[...stage.querySelectorAll('.vehicle-model')];
+  const cabins=[...stage.querySelectorAll('.cabin-model')];
   const motion=stage.querySelector('.vehicle-motion');
   const button=document.getElementById('replay-treatment');
   const progress=stage.querySelector('.treatment-progress i');
@@ -29,7 +30,7 @@
   }
   async function load(){
     if(loading||unavailable)return;
-    loading=import('./vehicle-renderer.js?v=9').then(({createVehicleScene})=>{
+    loading=import('./vehicle-renderer.js?v=10').then(({createVehicleScene})=>{
       engine=createVehicleScene(stage,images,status);
       engine.setVisible(visible);
       if(current)return engine.update(current);
@@ -49,6 +50,7 @@
       const active=image.dataset.vehicle===next.vehicle;
       image.classList.toggle('is-current',active);image.setAttribute('aria-hidden',String(!active));
     });
+    cabins.forEach(image=>image.classList.toggle('is-current',image.dataset.cabin===next.vehicle));
     const areas=next.key==='refresh'?[]:['Кузов'];
     next.extras.forEach(key=>areas.push(names[key]));
     document.getElementById('selected-treatments').textContent='В составе: '+areas.join(' · ');

@@ -134,9 +134,10 @@ export function createVehicleScene(stage,images,onStatus) {
   const renderer=new THREE.WebGLRenderer({canvas,context,alpha:true,antialias:true});
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.debug.onShaderError=()=>{throw new Error('Treatment renderer could not compile');};
-  renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2.5));
   canvas.className='vehicle-canvas';canvas.setAttribute('aria-hidden','true');
-  const host=stage.querySelector('.vehicle-models');host.append(canvas);
+  const host=stage.querySelector('.vehicle-models');
+  const body=host.querySelector('.vehicle-body');body.append(canvas);
   const scene=new THREE.Scene();
   const camera=new THREE.OrthographicCamera(-1.5,1.5,1,-1,.1,10);camera.position.z=5;
   const geometry=new THREE.PlaneGeometry(3,2);
@@ -150,11 +151,21 @@ export function createVehicleScene(stage,images,onStatus) {
   const filmMaterial=new THREE.ShaderMaterial({vertexShader:filmVertex,fragmentShader:filmFragment,uniforms:{uPeel:{value:0},uOpacity:{value:0}},transparent:true,depthWrite:false,side:THREE.DoubleSide});
   const filmMesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1,32,24),filmMaterial);filmMesh.position.z=.1;filmMesh.renderOrder=3;scene.add(filmMesh);
   const interior=stage.querySelector('.interior-detail');
-  function showInterior(show,instant=false){
+  let interiorRequest=0;
+  async function showInterior(show,instant=false){
     if(!interior)return;
-    gsap?.killTweensOf(interior);
-    if(!gsap||instant||reduced)interior.style.opacity=show?'1':'0';
-    else gsap.to(interior,{opacity:show?1:0,duration:.55,ease:'power2.inOut',overwrite:true});
+    const ticket=++interiorRequest;
+    if(show){
+      const image=interior.querySelector(`[data-cabin="${current?.vehicle}"]`);
+      try{await image?.decode();}catch{return;}
+      if(ticket!==interiorRequest||disposed)return;
+    }
+    gsap?.killTweensOf([interior,body]);
+    if(!gsap||instant||reduced){interior.style.opacity=show?'1':'0';body.style.opacity=show?'0':'1';}
+    else {
+      gsap.to(interior,{opacity:show?1:0,duration:.45,ease:'power2.inOut',overwrite:true});
+      gsap.to(body,{opacity:show?0:1,duration:.45,ease:'power2.inOut',overwrite:true});
+    }
     stage.dataset.detail=show?'interior':'body';
   }
   function draw(){if(!disposed&&!lost&&visible)renderer.render(scene,camera);}
@@ -164,6 +175,9 @@ export function createVehicleScene(stage,images,onStatus) {
   function run(t){if(visible&&!document.hidden&&!userPaused)t.play();}
   function fit(){
     const width=host.clientWidth,height=host.clientHeight;if(!width||!height)return;
+    // Match dense displays without letting large canvases grow unbounded.
+    const ratio=Math.min(devicePixelRatio||1,2.5,Math.sqrt(2200000/(width*height)));
+    if(renderer.getPixelRatio()!==ratio)renderer.setPixelRatio(ratio);
     renderer.setSize(width,height,false);
     const aspect=width/height;
     const halfW=aspect>1.5?aspect:1.5,halfH=aspect>1.5?1:1.5/aspect;
@@ -185,7 +199,8 @@ export function createVehicleScene(stage,images,onStatus) {
     if(cache.has(key))return cache.get(key);
     const image=images.find(item=>item.dataset.vehicle===key);await image.decode();
     if(disposed)return null;if(cache.has(key))return cache.get(key);
-    const photo=new THREE.Texture(image);photo.colorSpace=THREE.SRGBColorSpace;photo.needsUpdate=true;
+    const photo=new THREE.Texture(image);photo.colorSpace=THREE.SRGBColorSpace;
+    photo.generateMipmaps=false;photo.minFilter=THREE.LinearFilter;photo.magFilter=THREE.LinearFilter;photo.needsUpdate=true;
     const shape=surfaces[key],maps=makeMaps(shape);
     const wheel=([x,y,rx,ry])=>new THREE.Vector4(x/1200,y/800,rx/1200,ry/800);
     const uniforms={uPhoto:{value:photo},uZones:{value:maps.zones},uFilm:{value:maps.film},uProgress:{value:1},uMode:{value:0},uProgram:{value:0},uOpacity:{value:0},uMotion:{value:reduced?0:1},uExtraMode:{value:-1},uExtraProgress:{value:1},uSelected:{value:new THREE.Vector3()},uPointer:{value:new THREE.Vector2()},uWheelA:{value:wheel(shape.wheels[0])},uWheelB:{value:wheel(shape.wheels[1])}};
@@ -300,5 +315,5 @@ export function createVehicleScene(stage,images,onStatus) {
   document.addEventListener('visibilitychange',visibility);
   canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();lost=true;main?.pause();extra?.pause();swap?.pause();stage.dataset.renderer='fallback';onStatus({unavailable:true});});
   canvas.addEventListener('webglcontextrestored',()=>{lost=false;stage.dataset.renderer='webgl';onStatus({unavailable:false});fit();play();});
-  return {update,setVisible,setReduced,toggle,pointer,dispose(){disposed=true;request++;cancel();gsap?.killTweensOf(interior);resize.disconnect();document.removeEventListener('visibilitychange',visibility);cache.forEach(value=>{value.photo.dispose();value.zones.dispose();value.film.dispose();value.mesh.material.dispose();});geometry.dispose();filmMesh.geometry.dispose();filmMaterial.dispose();renderer.dispose();canvas.remove();}};
+  return {update,setVisible,setReduced,toggle,pointer,dispose(){disposed=true;request++;cancel();interiorRequest++;gsap?.killTweensOf([interior,body]);resize.disconnect();document.removeEventListener('visibilitychange',visibility);cache.forEach(value=>{value.photo.dispose();value.zones.dispose();value.film.dispose();value.mesh.material.dispose();});geometry.dispose();filmMesh.geometry.dispose();filmMaterial.dispose();renderer.dispose();canvas.remove();}};
 }
