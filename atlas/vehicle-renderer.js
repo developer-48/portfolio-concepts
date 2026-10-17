@@ -1,7 +1,9 @@
 import * as THREE from '../shared/three/three.module.min.js';
 import {GLTFLoader} from '../shared/three/GLTFLoader.js';
 import {MeshoptDecoder} from '../shared/three/meshopt_decoder.module.js';
-import {requestModel} from './model-data.js?v=13';
+import {requestModel} from './model-data.js?v=14';
+
+import {resolveVisualEffect} from './visual-state.mjs';
 
 const models={
   coupe:{file:'coupe',name:'Porsche 911 GT3 RS',height:1.43,cabin:[.12,1.10,.62],look:[-.15,.66,-.55]},
@@ -51,7 +53,9 @@ export function createVehicleScene(stage,_images,onStatus){
   const cache=new Map(),pendingModels=new Map();
   const fx={progress:{value:0},strength:{value:0},mode:{value:0}};
   const pose={x:5,y:2.5,z:5,tx:0,ty:.65,tz:0,fov:34,door:0,light:0};
-  let current=null,record=null,timeline=null,queue=[],activeExtra=null,paused=false,visible=false,reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let current=null,record=null,timeline=null,activeEffect=null,paused=false,visible=false,reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let playbackVersion=0,requestedEffect='restore';
+  const cacheLimit=matchMedia('(max-width:760px)').matches||navigator.deviceMemory<4?2:4;
   let disposed=false,lost=false,ticket=0,raf=0,frameCount=0,lastStatus=0,loading=false,drag=null;
   let frameSamples=[],previousFrame=0,quality=Math.min(devicePixelRatio,matchMedia('(max-width:760px)').matches?1.35:1.75);
   const metricsEnabled=new URLSearchParams(location.search).has('qa3d');
@@ -76,7 +80,7 @@ export function createVehicleScene(stage,_images,onStatus){
     previousFrame=timeline&&!paused?now:0;
     if(frameSamples.length>=50){const mean=frameSamples.reduce((a,b)=>a+b,0)/frameSamples.length;frameSamples=[];if(mean>26&&quality>1){quality=Math.max(1,quality-.25);resize();}}
     if(now-lastStatus>100){lastStatus=now;report();}
-    if(metricsEnabled){stage.dataset.frames=String(frameCount);stage.dataset.calls=String(renderer.info.render.calls);stage.dataset.triangles=String(renderer.info.render.triangles);stage.dataset.renderStats=JSON.stringify(metrics);stage.dataset.memory=JSON.stringify(renderer.info.memory);}
+    if(metricsEnabled){stage.dataset.frames=String(frameCount);stage.dataset.calls=String(renderer.info.render.calls);stage.dataset.triangles=String(renderer.info.render.triangles);stage.dataset.renderStats=JSON.stringify(metrics);stage.dataset.memory=JSON.stringify(renderer.info.memory);stage.dataset.door=pose.door.toFixed(3);stage.dataset.focus=activeEffect||current?.key||'';}
   }
   function invalidate(){if(!raf&&visible&&!document.hidden&&!lost&&!disposed)raf=requestAnimationFrame(draw);}
   function resize(){
@@ -87,6 +91,7 @@ export function createVehicleScene(stage,_images,onStatus){
   }
   const resizeObserver=new ResizeObserver(resize);resizeObserver.observe(host);
   function decorate(material,surface,vehicle){
+    if(vehicle!=='coupe')material=material.clone();
     const name=material.name||'';
     material.forceSinglePass=true;
     if('transmission' in material)material.transmission=0;
@@ -101,16 +106,21 @@ export function createVehicleScene(stage,_images,onStatus){
     else if(/chrome|metal|rim|wheel/i.test(name)){if(/wheels_chrome|GT3RS_black/i.test(name))material.color.multiplyScalar(.5);material.metalness=.85;material.roughness=Math.max(.22,Math.min(.4,material.roughness));}
     else if(/light|glass|screen/i.test(name)){material.metalness=.18;material.roughness=Math.max(.12,material.roughness);}
     else {material.metalness=Math.min(.55,material.metalness);material.roughness=Math.max(.28,material.roughness);}
-    if(surface==='paint')material=new THREE.MeshPhysicalMaterial({color:vehicle==='coupe'?0x06412f:0x87969e,metalness:.38,roughness:.34,clearcoat:1,clearcoatRoughness:.2});
+    if(surface==='paint')material=new THREE.MeshPhysicalMaterial({color:({coupe:0x06412f,sedan:0x87969e,crossover:0x314c68,suv:0x474d50})[vehicle],metalness:.38,roughness:.34,clearcoat:1,clearcoatRoughness:vehicle==='coupe'?.2:.27});
     if(surface==='glass'){
-      material=material.clone();material.color.set(0x718783);material.transparent=true;material.opacity=.22;material.depthWrite=false;material.roughness=.085;material.metalness=.25;material.forceSinglePass=true;
+      material=material.clone();material.color.set(vehicle==='coupe'?0x718783:0x23333f);material.transparent=true;material.opacity=vehicle==='coupe'?.22:.65;material.depthWrite=false;material.roughness=.085;material.metalness=.25;material.forceSinglePass=true;
     }
+    if(vehicle!=='coupe'&&/tires|tyres/i.test(name)){material.metalness=0;material.roughness=.88;material.transparent=false;material.opacity=1;material.clearcoat=0;material.normalScale?.set(.35,.35);}
+    if(vehicle!=='coupe'&&/^black_ext/i.test(name)){material.metalness=.12;material.clearcoat=.15;material.roughness=Math.max(.4,material.roughness);}
+    if(surface==='trim'){material.color.set(0x12171b);material.metalness=.2;material.roughness=.3;}
+    if(surface==='lens'){material.color.set(0xffffff);material.opacity=.18;material.transparent=true;material.depthWrite=false;material.roughness=.09;material.metalness=0;}
+    if(surface==='mirror'){material.color.set(0xb4bcc2);material.opacity=1;material.transparent=false;material.metalness=1;material.roughness=.12;}
     const kind={paint:0,interior:2,glass:3,wheels:4}[surface]??5;
     material.onBeforeCompile=shader=>{
       shader.uniforms.atlasProgress=fx.progress;shader.uniforms.atlasStrength=fx.strength;shader.uniforms.atlasMode=fx.mode;
       shader.vertexShader='varying vec3 vAtlasWorld;\n'+shader.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvAtlasWorld=(modelMatrix*vec4(transformed,1.0)).xyz;');
       shader.fragmentShader=`varying vec3 vAtlasWorld;uniform float atlasProgress;uniform float atlasStrength;uniform float atlasMode;\n`+shader.fragmentShader.replace('#include <opaque_fragment>',`
-        ${surface==='glass'?'diffuseColor.a *= mix(.2,1.8,pow(1.0-abs(dot(normal,normalize(vViewPosition))),3.0));':''}
+        ${surface==='glass'?`diffuseColor.a *= mix(${vehicle==='coupe'?'.2,1.8':'.8,1.35'},pow(1.0-abs(dot(normal,normalize(vViewPosition))),3.0));`:''}
         float scan = mix(-2.5,2.5,atlasProgress);
         float band = 1.0-smoothstep(.015,.16,abs(vAtlasWorld.z-scan));
         float selected = ${kind===0?'1.0-step(1.5,atlasMode)':`1.0-step(.1,abs(atlasMode-${kind}.0))`};
@@ -122,7 +132,7 @@ export function createVehicleScene(stage,_images,onStatus){
         outgoingLight += selected*atlasStrength*light*(band*.9+film*(band*.5+grid*.12));
         #include <opaque_fragment>`);
     };
-    material.customProgramCacheKey=()=>`atlas-surface-${kind}`;
+    material.customProgramCacheKey=()=>`atlas-surface-${kind}-${surface==='glass'&&vehicle!=='coupe'?'tinted':'original'}`;
     return material;
   }
   function disposeRecord(item){
@@ -134,9 +144,13 @@ export function createVehicleScene(stage,_images,onStatus){
     if(cache.has(vehicle)){const item=cache.get(vehicle);cache.delete(vehicle);cache.set(vehicle,item);return item;}
     if(pendingModels.has(vehicle))return pendingModels.get(vehicle);
     const request=(async()=>{
-    const buffer=await requestModel(vehicle,ratio=>{
+    const progress=ratio=>{
       if(disposed||current?.vehicle!==vehicle||!loading)return;
       onStatus({progress:ratio,label:ratio===1?'Готовим объёмную сцену…':ratio?`Загружаем 3D-модель · ${Math.round(ratio*100)}%`:'Загружаем 3D-модель…'});
+    };
+    const buffer=await requestModel(vehicle,progress).catch(error=>{
+      if(error.name==='AbortError'&&current?.vehicle===vehicle&&!disposed)return requestModel(vehicle,progress);
+      throw error;
     });
     if(disposed)return null;
     const data=await loader.parseAsync(buffer,'');
@@ -149,28 +163,28 @@ export function createVehicleScene(stage,_images,onStatus){
     const item={root,left:root.getObjectByName('DoorLeft'),right:root.getObjectByName('DoorRight')};
     if(disposed){disposeRecord(item);return null;}
     cache.set(vehicle,item);
-    while(cache.size>2){const entry=[...cache.entries()].find(([,value])=>value!==record&&value!==item);if(!entry)break;cache.delete(entry[0]);disposeRecord(entry[1]);}
+    while(cache.size>cacheLimit){const entry=[...cache.entries()].find(([,value])=>value!==record&&value!==item);if(!entry)break;cache.delete(entry[0]);disposeRecord(entry[1]);}
     return item;
     })();
     pendingModels.set(vehicle,request);
     try{return await request;}finally{if(pendingModels.get(vehicle)===request)pendingModels.delete(vehicle);}
   }
-  function kill(){if(timeline){timeline.kill();timeline=null;}fx.strength.value=0;previousFrame=0;activeExtra=null;}
+  function kill(){playbackVersion++;if(timeline){timeline.kill();timeline=null;}fx.strength.value=0;previousFrame=0;activeEffect=null;}
   function outside(){const h=models[current.vehicle].height;return{x:4.8,y:1.8,z:5.5,tx:0,ty:h*.46,tz:0,fov:32,door:0,light:0};}
   function front(){return{...outside(),x:1.25,y:1.5,z:5.5,ty:.65,tz:.45,fov:32};}
   function entrance(){return{...outside(),x:5.15,y:2.15,z:1.85,ty:models[current.vehicle].height*.57,fov:38,door:1.08,light:1.8};}
   function cabin(){const c=models[current.vehicle];return{x:c.cabin[0],y:c.cabin[1],z:c.cabin[2],tx:c.look[0],ty:c.look[1],tz:c.look[2],fov:72,door:1.08,light:1.2};}
   function restPose(){return current.key==='refresh'?entrance():current.key==='protect'?front():outside();}
   function createTimeline(done){
-    previousFrame=0;
-    const t=gsap.timeline({paused:true,onUpdate:invalidate,onComplete:()=>{timeline=null;fx.strength.value=0;invalidate();done?.();report();}});timeline=t;return t;
+    previousFrame=0;const version=playbackVersion;
+    const t=gsap.timeline({paused:true,onUpdate:invalidate,onComplete:()=>{if(version!==playbackVersion)return;timeline=null;fx.strength.value=0;invalidate();done?.();report();}});timeline=t;return t;
   }
-  function begin(t,label){report(label);stage.dataset.effect=activeExtra||current.key;if(visible&&!document.hidden&&!paused)t.play();invalidate();}
+  function begin(t,label){report(label);stage.dataset.effect=activeEffect||current.key;if(visible&&!document.hidden&&!paused)t.play();invalidate();}
   function setDetail(detail){stage.dataset.detail=detail;}
   function addInterior(t){
     t.call(()=>{setDetail('door');report('Салон · открываем передние двери');},[],0)
-     .to(pose,{...entrance(),door:0,duration:1.1,ease:'power2.inOut'},0)
-     .to(pose,{door:1.08,light:1.8,duration:1.15,ease:'power2.inOut'},.75)
+     .to(pose,{...entrance(),door:0,light:0,duration:.9,ease:'power2.inOut'},0)
+     .to(pose,{door:1.08,light:1.8,duration:1.15,ease:'power2.inOut'},.9)
      .call(()=>{setDetail('enter');report('Салон · кожа, текстиль и детали');},[],2.25)
      .to(pose,{x:1.65,y:models[current.vehicle].height*.8,z:.1,tx:0,ty:models[current.vehicle].height*.65,tz:.4,fov:60,duration:.8,ease:'power2.inOut'},2.25)
      .to(pose,{...cabin(),duration:1.1,ease:'power2.inOut'},3.05)
@@ -182,55 +196,52 @@ export function createVehicleScene(stage,_images,onStatus){
      .call(()=>setDetail('door'),[],7.8);
   }
   function animateEffect(effect,done){
-    kill();activeExtra=effect===current.key?null:effect;fx.mode.value=modeIds[effect];fx.progress.value=0;
-    if(reduced){Object.assign(pose,restPose());setDetail(current.key==='refresh'?'door':'body');invalidate();report('Состав выбран · модель можно повернуть');done?.();return;}
+    kill();activeEffect=effect;fx.mode.value=modeIds[effect];fx.progress.value=0;
+    if(reduced){Object.assign(pose,restPose());setDetail(current.key==='refresh'?'door':'body');activeEffect=current.key;stage.dataset.effect=current.key;invalidate();report('Состав выбран · модель можно повернуть');return;}
     const t=createTimeline(done);setDetail('body');
     if(effect==='refresh'||effect==='interior')addInterior(t);
     else{
       const dest=effect==='protect'?front():outside();
       if(effect==='wheels')Object.assign(dest,{x:5.2,y:1.3,z:2.1,ty:.48,fov:36});
       if(effect==='glass')Object.assign(dest,{x:3.3,y:2.8,z:4.3,ty:1,fov:34});
-      t.to(pose,{...dest,duration:1.15,ease:'power2.inOut'},0)
+      const {door,light,...view}=dest;
+      t.to(pose,{door:0,light:0,duration:.4,ease:'power2.inOut'},0)
+       .to(pose,{...view,duration:1.15,ease:'power2.inOut'},0)
        .to(fx.strength,{value:1,duration:.5},.9)
        .to(fx.progress,{value:1,duration:effect==='protect'?3.7:2.7,ease:'none'},1.15)
        .to(fx.strength,{value:0,duration:.55},effect==='protect'?4.3:3.35);
     }
     begin(t,labels[effect]);
   }
-  function next(){
-    queue=queue.filter(extra=>current.extras.includes(extra)&&!(current.key==='refresh'&&extra==='interior'));
-    if(queue.length){animateEffect(queue.shift(),next);return;}
-    activeExtra=null;
-    if(reduced){Object.assign(pose,restPose());invalidate();report('Состав выбран · модель можно повернуть');return;}
+  function finish(){
+    activeEffect=current.key;
+    const rest=restPose();
+    if(reduced||Object.keys(rest).every(key=>Math.abs(pose[key]-rest[key])<.0001)){Object.assign(pose,rest);setDetail(current.key==='refresh'?'door':'body');invalidate();report('Состав выбран · поверните модель');return;}
     const t=createTimeline(()=>{setDetail(current.key==='refresh'?'door':'body');report('Состав выбран · поверните модель');});
     t.to(pose,{...restPose(),duration:.9,ease:'power2.inOut'});begin(t,'Возвращаемся к выбранной программе');
   }
-  function play(){if(!record||loading)return;paused=false;metrics.frames=0;metrics.slowFrames=0;metrics.worstFrame=0;queue=current.extras.filter(e=>!(current.key==='refresh'&&e==='interior'));animateEffect(current.key,next);}
+  function play(effect=current.key){if(!record||loading)return;paused=false;metrics.frames=0;metrics.slowFrames=0;metrics.worstFrame=0;animateEffect(effect,finish);}
   async function update(nextState){
     const previous=current;current={...nextState,extras:[...nextState.extras]};
     const changedModel=!previous||previous.vehicle!==current.vehicle;
     const changedProgram=!previous||previous.key!==current.key;
-    if(!changedModel&&!changedProgram){
-      const added=current.extras.filter(e=>!previous.extras.includes(e)&&!(current.key==='refresh'&&e==='interior'));
-      queue=queue.filter(e=>current.extras.includes(e));queue.push(...added.filter(e=>!queue.includes(e)));
-      if(activeExtra&&!current.extras.includes(activeExtra)){kill();next();}
-      else if(!timeline&&!loading&&queue.length)next();
-      return;
-    }
-    kill();queue=[];paused=false;
+    const effect=resolveVisualEffect(previous,current,loading?requestedEffect:activeEffect);
+    if(effect)requestedEffect=effect;
+    if(!changedModel&&!changedProgram){if(effect&&!loading)play(effect);return;}
+    kill();paused=false;
     if(changedModel){
       const version=++ticket,loadStarted=performance.now();loading=true;stage.dataset.loading='true';report('Загружаем 3D-модель…');onStatus({progress:0});
       try{
         const item=await loadModel(current.vehicle);if(version!==ticket||disposed)return;
         record?.root.removeFromParent();record=item;scene.add(record.root);renderer.shadowMap.needsUpdate=true;shadowDoor=-1;
         Object.assign(pose,outside());applyPose();resize();
-        const compileStarted=performance.now();await renderer.compileAsync(scene,camera);
+        const compileStarted=performance.now();if(!item.compiled){await renderer.compileAsync(scene,camera);item.compiled=true;}
         if(metricsEnabled){stage.dataset.compileMs=String(Math.round(performance.now()-compileStarted));stage.dataset.loadMs=String(Math.round(performance.now()-loadStarted));stage.dataset.readyMs=String(Math.round(performance.now()));}
         if(version!==ticket||disposed)return;
         loading=false;stage.dataset.loading='false';
         applyPose();renderer.render(scene,camera);stage.dataset.renderer='webgl';
         stage.dataset.model=models[current.vehicle].name;onStatus({unavailable:false,model:models[current.vehicle].name});
-        invalidate();play();
+        invalidate();play(requestedEffect);
       }catch(error){if(version!==ticket||disposed)return;loading=false;stage.dataset.loading='false';stage.dataset.renderer='fallback';onStatus({unavailable:true,label:'3D недоступно · расчёт продолжает работать'});console.warn('ATLAS: model could not load',error);}
     }else if(!loading)play();
   }
@@ -240,9 +251,9 @@ export function createVehicleScene(stage,_images,onStatus){
   }
   function setVisible(value){visible=value;syncVisibility();}
   document.addEventListener('visibilitychange',syncVisibility);
-  function setReduced(value){reduced=value;kill();queue=[];paused=false;if(record&&current){Object.assign(pose,restPose());setDetail(current.key==='refresh'?'door':'body');invalidate();report('Состав выбран · модель можно повернуть');}}
+  function setReduced(value){reduced=value;kill();paused=false;if(record&&current){Object.assign(pose,restPose());setDetail(current.key==='refresh'?'door':'body');invalidate();report('Состав выбран · модель можно повернуть');}}
   function toggle(){if(loading)return;if(!timeline){play();return;}paused=!paused;syncVisibility();if(paused)timeline.pause();report();}
-  function stopForInspection(){kill();queue=[];paused=false;fx.strength.value=0;setDetail('inspect');report('Осмотр модели · вращайте мышью или пальцем');}
+  function stopForInspection(){kill();paused=false;fx.strength.value=0;setDetail('inspect');report('Осмотр модели · вращайте мышью или пальцем');}
   function rotate(dx,dy){
     const delta=new THREE.Vector3(pose.x-pose.tx,pose.y-pose.ty,pose.z-pose.tz),s=new THREE.Spherical().setFromVector3(delta);
     s.theta-=dx*.009;s.phi=THREE.MathUtils.clamp(s.phi+dy*.006,.45,Math.PI*.48);s.radius=Math.max(4.4,s.radius);

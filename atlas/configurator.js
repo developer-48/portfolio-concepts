@@ -27,13 +27,13 @@
     button.hidden=reduce.matches||unavailable;
   }
   function prepare(){
-    transport??=import('./model-data.js?v=13');
-    if(!primed){const link=document.createElement('link');link.rel='modulepreload';link.href='./vehicle-scene.min.js?v=13';link.fetchPriority='low';document.head.append(link);primed=true;}
+    transport??=import('./model-data.js?v=14');
+    if(!primed){const link=document.createElement('link');link.rel='modulepreload';link.href='./vehicle-scene.min.js?v=14';link.fetchPriority='low';document.head.append(link);primed=true;}
     transport.then(({requestModel})=>requestModel(current?.vehicle||'coupe')).catch(()=>{});
   }
   async function load(){
     if(loading||unavailable)return;
-    prepare();loading=import('./vehicle-scene.min.js?v=13').then(({createVehicleScene})=>{
+    prepare();loading=import('./vehicle-scene.min.js?v=14').then(({createVehicleScene})=>{
       engine=createVehicleScene(stage,[],status);engine.setVisible(visible);if(current)return engine.update(current);
     }).catch(error=>{stage.dataset.renderer='fallback';status({unavailable:true,label:'3D недоступно · расчёт продолжает работать'});engine?.dispose();engine=null;console.warn('ATLAS: 3D initialization failed',error);});
     return loading;
@@ -48,8 +48,8 @@
     document.getElementById('treatment-description').textContent=descriptions[next.key];
     stage.dataset.vehicle=next.vehicle;stage.dataset.mode=next.key;
     stage.setAttribute('aria-label',`${character}. Интерактивная 3D-модель. Поворот: мышь, палец или клавиши со стрелками. Home — вернуть ракурс. ${descriptions[next.key]}`);
-    if(changedVehicle){fallback.src=`../assets/atlas-3d/${next.vehicle}-poster.webp?v=13`;fallback.alt=`${character} · студийный вид`;if(primed)prepare();}
-    const areas=next.key==='refresh'?[]:['Кузов'];next.extras.forEach(key=>areas.push(names[key]));
+    if(changedVehicle){fallback.src=`../assets/atlas-3d/${next.vehicle}-poster.webp?v=14`;fallback.alt=`${character} · студийный вид`;if(primed)prepare();}
+    const areas=next.key==='refresh'?['Салон']:['Кузов'];next.extras.forEach(key=>{if(!areas.includes(names[key]))areas.push(names[key]);});
     document.getElementById('selected-treatments').textContent='В составе: '+areas.join(' · ');
     if(engine)engine.update(current).catch(()=>{stage.dataset.renderer='fallback';status({unavailable:true});engine?.dispose();engine=null;});else if(visible)load();
   }

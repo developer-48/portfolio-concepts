@@ -1,13 +1,16 @@
 # ATLAS asset tools
 
-Node 20.9+. Run `npm install` in this directory, then `npm run build` after changing `atlas/vehicle-renderer.js`. The generated ES module is committed for buildless GitHub Pages deployment. Three.js, GLTFLoader and meshopt remain local; the lightweight model transport is external so downloading can start before the renderer.
+Node 20.9+. Run `npm ci` in this directory, then `npm run build` after changing `atlas/vehicle-renderer.js`. The ES module is committed for buildless GitHub Pages deployment. Runtime libraries are local; model transport stays separate to start downloading before the renderer is parsed.
 
 ## Geometry
 
-`node optimize.mjs INPUT_DIRECTORY OUTPUT_DIRECTORY`
+Porsche's approved v13 assets are preserved byte for byte. The v14 tools rebuild only sedan, crossover and SUV from the original source GLBs listed in `../../ASSETS-V12.md`.
 
-Inputs are the four normalized, rigged v12 GLBs from commit `3fb11a0` (`assets/atlas-3d/{coupe,sedan,crossover,suv}.glb`), not previously simplified output. Preserve this baseline outside the published directory when rebuilding. Paint geometry and original normals are preserved; small details are simplified to ratio 0.35 with 0.001 error limit. Textures are WebP up to 768 px. Meshopt uses 14-bit positions / 12-bit normals. Each GLB also gets a gzip transport file; browsers without DecompressionStream request the raw GLB.
+1. `node prepare.mjs ORIGINAL.glb BASELINE/sedan.glb sedan` (repeat for `crossover`, `suv`). This bakes source transforms, normalizes the vehicle to 4.65 units, identifies front door hinges and classifies materials. Use original source models, never an already simplified asset.
+2. `node optimize.mjs BASELINE OUTPUT`. OUTPUT must contain the prior licensed assets so their embedded attribution metadata is retained. This repairs paint normals, simplifies small details at ratio 0.35 / error 0.001, preserves body positions and triangle count, and compresses textures to WebP up to 768 px. A 30° crease and bounded smoothing retain panel edges without the damaged-looking reflections from source normals.
 
-The four transparent 1280×640 WebP posters are captures of the actual renderer with the default `restore` pose, reduced motion, no UI and the same environment. If lighting, materials or the default camera change, regenerate all posters. Keep vertical field of view and image height aligned with the live canvas. QA screenshots and rendering helpers do not belong in the deployment.
+Meshopt uses 14-bit positions. Its `high` mode stores normals using its built-in 8-bit octahedral filter (the `quantizeNormal` option does not override that filter). A higher-precision comparison was checked during v14 development; the substantive shading defect was the source normals, not that final filter. Each GLB has a gzip transport version and an uncompressed GLB fallback for browsers without DecompressionStream.
 
-Original models / authors / CC BY 4.0 attribution: ../../ASSETS-V12.md and ../../atlas/model-credits.html.
+The transparent 1280×640 posters are captures of the actual renderer in default `restore` pose with reduced motion and no UI. Rebuild only affected posters when materials change; retain the same vertical field of view. QA screenshots and temporary rendering helpers do not belong in deployment.
+
+Authors and CC BY 4.0 attribution: `../../ASSETS-V12.md` and `../../atlas/model-credits.html`.
