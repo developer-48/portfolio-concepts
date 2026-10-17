@@ -30,41 +30,40 @@
   }
 
   if(!$('#configuration-result'))return;
-  const packages={
-    refresh:{title:'Чистый интерьер',price:11000,time:'1–2 дня',items:['Очистка кожи, текстиля и пластика','Работа с труднодоступными зонами','Сушка и контроль результата']},
-    restore:{title:'Глубина цвета',price:38000,time:'2–3 дня',items:['Многоэтапная очистка кузова','Согласованная коррекция лака','Нанесение защитного покрытия']},
-    protect:{title:'Защита спереди',price:85000,time:'3–4 дня',items:['Очистка и подготовка поверхности','Плёнка: капот, бампер, передние крылья','Оклейка зеркал и контроль краёв']}
-  };
-  const extras={glass:{title:'Уход за стёклами',price:3500},wheels:{title:'Уход за дисками',price:6000},interior:{title:'Глубокий уход за салоном',price:12000}};
-  const vehicleClasses={coupe:{name:'Купе',factor:1},sedan:{name:'Седан',factor:1},crossover:{name:'Кроссовер',factor:1.2},suv:{name:'Большой SUV',factor:1.4}};
+  const Care=window.AtlasCare;
+  const {extras}=Care;
+  let state=Care.initial(new URLSearchParams(location.search).get('package'));
   let configuration;
-  function calculate(){
-    const key=$('input[name="package"]:checked').value;
-    const vehicle=$('input[name="car-class"]:checked').value;
-    const {factor,name:className}=vehicleClasses[vehicle];
-    const pack=packages[key];
-    const interior=$('input[name="extra"][value="interior"]');
-    interior.disabled=key==='refresh';
-    if(interior.disabled)interior.checked=false;
-    $('#interior-extra-note').textContent=interior.disabled?'Уже входит в выбранную программу':'Текстиль, кожа, пластик';
-    Object.entries(extras).forEach(([name,item])=>{$(`[data-extra-cost="${name}"]`).textContent=name==='interior'&&interior.disabled?'Включено':'+ '+money(Math.round(item.price*factor));});
-    const chosen=[...document.querySelectorAll('input[name="extra"]:checked')].map(input=>extras[input.value]);
-    const base=Math.round(pack.price*factor);
-    const total=base+chosen.reduce((sum,item)=>sum+Math.round(item.price*factor),0);
-    configuration={key,pack,factor,chosen,base,total,className};
-    $('#configuration-result').dataset.package=key;
-    $('#package-title').textContent=pack.title;
-    $('#package-included').innerHTML=pack.items.map(text=>`<li>${icon('check')}${text}</li>`).join('');
-    $('#estimate-price').textContent='от '+money(total);
-    $('#mobile-estimate-price').textContent='от '+money(total);
-    $('#estimate-duration').textContent='Программа: '+pack.time+(chosen.length?' · дополнения могут увеличить срок':'');
-    $('#estimate-breakdown').innerHTML=`<div><span>${pack.title}</span><span>${money(base)}</span></div>`+chosen.map(item=>`<div><span>${item.title}</span><span>${money(Math.round(item.price*factor))}</span></div>`).join('');
-    window.AtlasShowroom?.update({vehicle,key,extras:[...document.querySelectorAll('input[name="extra"]:checked')].map(input=>input.value)});
+  function render(changed){
+    const c=configuration=Care.calculate(state);
+    document.querySelectorAll('input[name="car-class"]').forEach(input=>input.checked=input.value===state.vehicle);
+    document.querySelectorAll('input[name="package"]').forEach(input=>input.checked=input.value===state.program);
+    document.querySelectorAll('input[name="extra"]').forEach(input=>{
+      const included=c.pack.includes.includes(input.value);
+      input.checked=c.effective.includes(input.value);
+      input.disabled=included;
+      input.closest('label').dataset.included=String(included);
+      $(`[data-extra-cost="${input.value}"]`).textContent=included?'В программе':'+ '+money(Math.round(extras[input.value].price*c.factor));
+    });
+    $('#interior-extra-note').textContent=c.pack.includes.includes('interior')?'Уже включена. Повторной оплаты нет.':'Кожа, текстиль, пластик и сушка';
+    $('#configuration-result').dataset.package=c.key;
+    $('#package-title').textContent=c.pack.title;
+    $('#package-included').innerHTML=c.pack.items.map(text=>`<li>${icon('check')}${text}</li>`).join('');
+    $('#estimate-price').textContent='от '+money(c.total);
+    $('#mobile-estimate-price').textContent='от '+money(c.total);
+    $('#estimate-duration').textContent='Программа: '+c.pack.time+(c.chosen.length?' · дополнения могут увеличить срок':'');
+    $('#estimate-breakdown').innerHTML=`<div><span>${c.pack.title}</span><span>${money(c.base)}</span></div>`+c.chosen.map(item=>`<div><span>${item.title}</span><span>${money(Math.round(item.price*c.factor))}</span></div>`).join('');
+    window.AtlasShowroom?.update({vehicle:c.vehicle,key:c.key,extras:c.effective,changed});
   }
-  document.querySelectorAll('.configure-options input').forEach(input=>input.addEventListener('change',calculate));
-  function selectPackage(key){if(!packages[key])return;$(`input[name="package"][value="${key}"]`).checked=true;calculate();}
-  document.querySelectorAll('[data-package-link]').forEach(link=>link.addEventListener('click',()=>selectPackage(link.dataset.packageLink)));
-  calculate(); selectPackage(new URLSearchParams(location.search).get('package'));
+  document.querySelectorAll('.configure-options input').forEach(input=>input.addEventListener('change',()=>{
+    const type={'car-class':'vehicle',package:'program',extra:'extra'}[input.name];
+    state=Care.change(state,{type,value:input.value,checked:input.checked});
+    render(type==='extra'?input.value:type);
+  }));
+  document.querySelectorAll('[data-package-link]').forEach(link=>link.addEventListener('click',()=>{
+    state=Care.change(state,{type:'program',value:link.dataset.packageLink});render('program');
+  }));
+  render();
   const brief=$('#a-brief');
   document.querySelectorAll('[data-save-brief]').forEach(button=>button.addEventListener('click',()=>{
     const c=configuration;
