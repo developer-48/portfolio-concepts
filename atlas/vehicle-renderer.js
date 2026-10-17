@@ -35,7 +35,7 @@ export function createVehicleScene(stage,_images,onStatus){
   const shadowTexture=new THREE.CanvasTexture(shadowCanvas),shadow=new THREE.Mesh(new THREE.PlaneGeometry(3.2,5.6),new THREE.MeshBasicMaterial({map:shadowTexture,transparent:true,depthWrite:false}));
   shadow.rotation.x=-Math.PI/2;shadow.position.y=-.015;scene.add(shadow);
   const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  const cache=new Map();
+  const cache=new Map(),pendingModels=new Map();
   const fx={progress:{value:0},strength:{value:0},mode:{value:0}};
   const pose={x:5,y:2.5,z:5,tx:0,ty:.65,tz:0,fov:34,door:0,light:0};
   let current=null,record=null,timeline=null,queue=[],activeExtra=null,paused=false,visible=false,reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -106,7 +106,13 @@ export function createVehicleScene(stage,_images,onStatus){
   }
   async function loadModel(vehicle){
     if(cache.has(vehicle)){const item=cache.get(vehicle);cache.delete(vehicle);cache.set(vehicle,item);return item;}
-    const data=await loader.loadAsync(`../assets/atlas-3d/${models[vehicle].file}.glb?v=12`);
+    if(pendingModels.has(vehicle))return pendingModels.get(vehicle);
+    const request=(async()=>{
+    const data=await loader.loadAsync(`../assets/atlas-3d/${models[vehicle].file}.glb?v=12`,event=>{
+      if(disposed||current?.vehicle!==vehicle||!loading)return;
+      const ratio=event.total?Math.min(1,event.loaded/event.total):0;
+      onStatus({progress:ratio,label:ratio===1?'Готовим объёмную сцену…':ratio?`Загружаем 3D-модель · ${Math.round(ratio*100)}%`:'Загружаем 3D-модель…'});
+    });
     const root=data.scene,materialCache=new Map();root.traverse(o=>{if(!o.isMesh)return;
       const surface=o.userData.surface||o.parent?.userData.surface||'detail';
       const key=o.material.uuid+'|'+surface;
@@ -118,6 +124,9 @@ export function createVehicleScene(stage,_images,onStatus){
     cache.set(vehicle,item);
     while(cache.size>2){const entry=[...cache.entries()].find(([,value])=>value!==record&&value!==item);if(!entry)break;cache.delete(entry[0]);disposeRecord(entry[1]);}
     return item;
+    })();
+    pendingModels.set(vehicle,request);
+    try{return await request;}finally{if(pendingModels.get(vehicle)===request)pendingModels.delete(vehicle);}
   }
   function kill(){if(timeline){timeline.kill();timeline=null;}fx.strength.value=0;previousFrame=0;activeExtra=null;}
   function outside(){const h=models[current.vehicle].height;return{x:5.0,y:2.65,z:5.1,tx:0,ty:h*.46,tz:0,fov:34,door:0,light:0};}
@@ -183,7 +192,7 @@ export function createVehicleScene(stage,_images,onStatus){
     }
     kill();queue=[];paused=false;
     if(changedModel){
-      const version=++ticket;loading=true;stage.dataset.loading='true';report('Загружаем 3D-модель…');
+      const version=++ticket;loading=true;stage.dataset.loading='true';report('Загружаем 3D-модель…');onStatus({progress:0});
       try{
         const item=await loadModel(current.vehicle);if(version!==ticket||disposed)return;
         record?.root.removeFromParent();record=item;scene.add(record.root);
@@ -214,7 +223,7 @@ export function createVehicleScene(stage,_images,onStatus){
   function pointerMove(event){if(!drag)return;const dx=event.clientX-drag.x,dy=event.clientY-drag.y;if(!drag.moved){if(Math.abs(dx)+Math.abs(dy)<3)return;stopForInspection();drag.moved=true;if(pose.fov>60)Object.assign(pose,entrance());}rotate(dx,dy);drag.x=event.clientX;drag.y=event.clientY;}
   function pointerUp(){drag=null;}
   canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp);
-  function keydown(event){if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home'].includes(event.key)||!record)return;event.preventDefault();stopForInspection();if(event.key==='Home'){Object.assign(pose,restPose());invalidate();return;}if(pose.fov>60)Object.assign(pose,entrance());rotate(event.key==='ArrowLeft'?-18:event.key==='ArrowRight'?18:0,event.key==='ArrowUp'?-12:event.key==='ArrowDown'?12:0);}
+  function keydown(event){if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home'].includes(event.key)||!record||loading)return;event.preventDefault();stopForInspection();if(event.key==='Home'){Object.assign(pose,restPose());invalidate();return;}if(pose.fov>60)Object.assign(pose,entrance());rotate(event.key==='ArrowLeft'?-18:event.key==='ArrowRight'?18:0,event.key==='ArrowUp'?-12:event.key==='ArrowDown'?12:0);}
   stage.addEventListener('keydown',keydown);
   function contextLost(event){event.preventDefault();lost=true;kill();stage.dataset.renderer='fallback';onStatus({unavailable:true,label:'3D недоступно · расчёт продолжает работать'});}
   canvas.addEventListener('webglcontextlost',contextLost);

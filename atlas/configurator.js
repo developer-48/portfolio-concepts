@@ -28,7 +28,7 @@
   }
   async function load(){
     if(loading||unavailable)return;
-    loading=import('./vehicle-renderer.js?v=12').then(({createVehicleScene})=>{
+    loading=import('./vehicle-renderer.js?v=12.1').then(({createVehicleScene})=>{
       engine=createVehicleScene(stage,[],status);engine.setVisible(visible);if(current)return engine.update(current);
     }).catch(error=>{stage.dataset.renderer='fallback';status({unavailable:true,label:'3D недоступно · расчёт продолжает работать'});engine?.dispose();engine=null;console.warn('ATLAS: 3D initialization failed',error);});
     return loading;
@@ -48,7 +48,7 @@
     document.getElementById('selected-treatments').textContent='В составе: '+areas.join(' · ');
     if(engine)engine.update(current).catch(()=>{stage.dataset.renderer='fallback';status({unavailable:true});engine?.dispose();engine=null;});else if(visible)load();
   }
-  const nearby=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){load();nearby.disconnect();}},{rootMargin:'250px'});nearby.observe(stage);
+  const nearby=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){load();nearby.disconnect();}},{rootMargin:'1400px'});nearby.observe(stage);
   const observer=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;engine?.setVisible(visible);if(visible)load();},{threshold:.05});observer.observe(stage);
   button.addEventListener('click',()=>engine?.toggle());
   reduce.addEventListener('change',()=>{engine?.setReduced(reduce.matches);status({});});
