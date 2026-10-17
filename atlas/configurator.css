@@ -55,27 +55,20 @@
 @media(max-width:760px){.mobile-configuration-total{display:flex;align-items:center;justify-content:space-between;gap:15px;border-top:1px solid #bdc7ce;padding-top:22px}.mobile-configuration-total>div>span{display:block;font-size:9px;color:#65798a}.mobile-configuration-total #mobile-estimate-price{font-weight:400;display:block;font-size:23px;letter-spacing:-.05em}.mobile-configuration-total .a-button{padding:13px 19px;font-size:10px;background:#253444;color:#e7eff5;min-height:46px}.mobile-configuration-total .a-button:hover{background:#3d5368}}
 @media(max-width:380px){.mobile-configuration-total{align-items:stretch;flex-direction:column}.mobile-configuration-total .a-button{justify-content:center}}
 
-/* Treatment preview: the surface renderer never changes a user's selection. */
-.vehicle-models{transform:none;inset:0}
-.vehicle-body{position:absolute;inset:0}
-.vehicle-canvas{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none}
+/* One real-time 3D canvas, with one static fallback illustration. */
+.vehicle-body{position:absolute;inset:0 0 28px}
+.vehicle-model{filter:none;transform:none}
+.vehicle-canvas{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:grab;touch-action:pan-y;outline:none}
+.vehicle-canvas:active{cursor:grabbing}
 .vehicle-stage[data-renderer=webgl] .vehicle-canvas{opacity:1}
-.vehicle-stage[data-renderer=webgl] .vehicle-model{opacity:0;pointer-events:none}
-.vehicle-entry,.interior-detail{position:absolute;inset:0;opacity:0;pointer-events:none;z-index:2}
-.entry-model,.cabin-model,.cabin-context-image{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;visibility:hidden;user-select:none}
-.scene-vehicle-image.is-current{opacity:1;visibility:visible}
-.cabin-frame{position:absolute;inset:5% 4% 12%;overflow:hidden;border-radius:22px;background:#101820;box-shadow:0 18px 45px #0003;isolation:isolate}
-.cabin-model{object-fit:cover}
-.cabin-frame:after{content:'';position:absolute;inset:0;background:linear-gradient(transparent 65%,#071019d9);pointer-events:none}
-.cabin-caption{position:absolute;bottom:17px;left:19px;z-index:2;color:#d3e1e8;letter-spacing:.12em;font-size:8px}
-.cabin-light{position:absolute;inset:-15%;background:linear-gradient(108deg,transparent 36%,#e7f5ff0d 47%,#fff2 50%,#e7f5ff0d 53%,transparent 64%);mix-blend-mode:screen;opacity:0;pointer-events:none}
-.cabin-context{position:absolute;right:3%;bottom:0;width:32%;height:39%;filter:drop-shadow(0 8px 8px #0008);z-index:3}
-.vehicle-stage[data-renderer=fallback] .vehicle-body{opacity:1!important}
-.vehicle-stage[data-renderer=fallback] .vehicle-entry{opacity:0!important}
-.vehicle-stage[data-renderer=fallback] .interior-detail{opacity:0!important}
-.vehicle-stage[data-renderer=fallback][data-mode=refresh] .vehicle-body{opacity:0!important}
-.vehicle-stage[data-renderer=fallback][data-mode=refresh] .interior-detail{opacity:1!important}
+.vehicle-stage[data-renderer=webgl] .vehicle-model{opacity:0;visibility:hidden}
+.vehicle-stage:focus-visible{outline:1px solid #b1d9e5;outline-offset:4px;border-radius:20px}
+.vehicle-stage[data-loading=true] .vehicle-canvas{opacity:.35}
+.vehicle-stage[data-renderer=fallback] .vehicle-model{opacity:1;visibility:visible}
 .vehicle-stage{aspect-ratio:1.55}
+.model-interaction-hint{position:absolute;left:30px;top:8px;display:flex;align-items:center;gap:7px;font-size:8px;letter-spacing:.03em;color:#73919e;pointer-events:none}
+.model-interaction-hint svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round}
+.vehicle-stage[data-loading=true] .model-interaction-hint,.vehicle-stage[data-renderer=fallback] .model-interaction-hint{visibility:hidden}
 .scene-status{position:absolute;bottom:0;left:30px;right:30px;pointer-events:none}
 .scene-status{z-index:3}
 .scene-status-label{color:#a8c7d6;font-size:11px;letter-spacing:.01em}
@@ -125,5 +118,4 @@
 @media(max-width:760px){.a-configure .configure-layout{display:flex;flex-direction:column;align-items:stretch}}
 
 @media(max-width:760px){.configure-options input{scroll-margin-block:310px 40px}}
-@media(max-width:760px){.cabin-frame{inset:0 13px 16px;border-radius:17px}.cabin-caption{font-size:6px;left:12px;bottom:12px;letter-spacing:.08em}.cabin-context{width:31%;right:4%;bottom:-2%;height:40%}}
-@media(prefers-reduced-motion:reduce){.vehicle-body,.vehicle-entry,.cabin-frame,.cabin-light{transform:none!important}}
+@media(max-width:760px){.model-interaction-hint{left:20px;top:0;font-size:7px}.model-interaction-hint svg{width:15px;height:15px}.vehicle-body{inset:6px 0 20px}}

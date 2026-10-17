@@ -1,351 +1,222 @@
 import * as THREE from '../shared/three/three.module.min.js';
-import {surfaces} from './vehicle-surfaces.js?v=9';
-import {frontSurfaces} from './vehicle-front-surfaces.js?v=11';
+import {GLTFLoader} from '../shared/three/GLTFLoader.js';
+import {MeshoptDecoder} from '../shared/three/meshopt_decoder.module.js';
+import {RoomEnvironment} from '../shared/three/RoomEnvironment.js';
 
-const vertexShader = `
-  varying vec2 vUv;
-  void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }
-`;
-const fragmentShader = `
-  uniform sampler2D uPhoto;
-  uniform sampler2D uZones;
-  uniform sampler2D uFilm;
-  uniform float uProgress;
-  uniform float uMode;
-  uniform float uProgram;
-  uniform float uFrontal;
-  uniform float uOpacity;
-  uniform float uMotion;
-  uniform float uExtraMode;
-  uniform float uExtraProgress;
-  uniform vec3 uSelected;
-  uniform vec2 uPointer;
-  uniform vec4 uWheelA;
-  uniform vec4 uWheelB;
-  varying vec2 vUv;
-  float band(float x,float center,float width){return exp(-pow((x-center)/width,2.0));}
-  float wheelLight(vec2 p,vec4 wheel,float phase){
-    vec2 q=(p-wheel.xy)/wheel.zw;
-    float rim=band(length(q),.9,.12);
-    float arc=pow(max(0.0,cos(atan(q.y,q.x)-phase*6.283)),12.0);
-    return rim*(.16+arc*1.5);
-  }
-  void main(){
-    vec2 p=vec2(vUv.x,1.0-vUv.y);
-    vec4 photo=texture2D(uPhoto,vUv);
-    vec3 zone=texture2D(uZones,vUv).rgb;
-    float film=texture2D(uFilm,vUv).r;
-    float polish=1.0-step(.5,abs(uMode));
-    float protection=1.0-step(.5,abs(uMode-1.0));
-    float glass=1.0-step(.5,abs(uExtraMode-3.0));
-    float wheels=1.0-step(.5,abs(uExtraMode-4.0));
-    float effect=smoothstep(0.0,.08,uProgress)*(1.0-smoothstep(.86,1.0,uProgress))*uMotion;
-    float phase=mix(-.25,1.45,uProgress);
-    // Curved coordinates make the lighting wrap across the photographed panels.
-    float surface=mix(p.x+.12*sin(p.y*6.0)+.09*p.y,p.y+.025*cos(p.x*6.283),uFrontal);
-    float line=band(surface,phase,.009);
-    float glow=band(surface,phase,.065);
-    float second=band(surface,phase-.07,.017);
-    float luminance=dot(photo.rgb,vec3(.21,.72,.07));
-    vec3 color=photo.rgb;
-    float shine=zone.r*(line*1.05+glow*.25+second*.12)*effect*polish;
-    color+=vec3(.53,.79,1.0)*shine*(.65+luminance);
-    // A restrained clear layer remains after the film settles on the paint.
-    float hasFilm=1.0-step(.5,abs(uProgram-1.0));
-    float filmReveal=smoothstep(surface-.05,surface+.05,phase);
-    color+=vec3(.04,.19,.25)*film*hasFilm*(.12+filmReveal*.22)*mix(1.0,.16,uFrontal);
-    float gridX=pow(.5+.5*cos((p.x+.12*p.y)*340.0),20.0);
-    float gridY=pow(.5+.5*cos((p.y-.05*sin(p.x*6.0))*340.0),20.0);
-    float filmDetail=(max(gridX,gridY)*.16+line*1.1+glow*.35)*film*protection*effect;
-    color+=vec3(.24,.83,1.0)*filmDetail;
-    // Extras have an independent clock; they never overwrite the body treatment.
-    float extraEffect=sin(clamp(uExtraProgress,0.0,1.0)*3.14159)*uMotion;
-    float extraPhase=mix(.2,1.15,uExtraProgress);
-    float glassLight=band(p.x+p.y*.18,extraPhase,.055);
-    color+=zone.g*glass*extraEffect*vec3(.24,.35,.39)*glassLight;
-    color+=zone.g*uSelected.x*vec3(.003,.009,.012);
-    float rims=wheelLight(p,uWheelA,uExtraProgress)+wheelLight(p,uWheelB,uExtraProgress);
-    color+=zone.b*wheels*extraEffect*vec3(.14,.18,.20)*rims;
-    color+=zone.b*uSelected.y*vec3(.008,.010,.012);
-    // The user can inspect reflections by moving the pointer; no idle oscillation.
-    float pointerLight=band(surface,uPointer.x*.5+.35,.12)*uPointer.y;
-    color+=zone.r*pointerLight*vec3(.07,.10,.12);
-    gl_FragColor=vec4(color,photo.a*uOpacity);
-    #include <colorspace_fragment>
-  }
-`;
-const filmVertex = `
-  uniform float uPeel;
-  varying vec2 vUv;
-  void main(){
-    vUv=uv;
-    vec3 p=position;
-    float curl=sin(uv.y*1.5708)*uPeel;
-    p.y+=curl*.27;
-    p.x+=sin(uv.x*3.14159)*curl*.035;
-    p.z+=curl*.42;
-    gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0);
-  }
-`;
-const filmFragment = `
-  uniform float uOpacity;
-  uniform float uPeel;
-  varying vec2 vUv;
-  void main(){
-    float edge=1.0-smoothstep(.0,.035,min(min(vUv.x,1.0-vUv.x),min(vUv.y,1.0-vUv.y)));
-    float roll=exp(-pow((vUv.y-(.22+uPeel*.5))/.075,2.0));
-    float weave=pow(.5+.5*cos(vUv.x*180.0),24.0)*.04;
-    vec3 col=mix(vec3(.13,.5,.6),vec3(.78,.97,1.0),min(1.0,edge*.7+roll*.7));
-    gl_FragColor=vec4(col,(.08+edge*.5+roll*.3+weave)*uOpacity);
-    #include <colorspace_fragment>
-  }
-`;
+const models={
+  coupe:{file:'coupe',name:'Porsche 911 GT3 RS',height:1.43,cabin:[.12,1.10,.62],look:[-.15,.66,-.55]},
+  sedan:{file:'sedan',name:'Mercedes-Benz S 65',height:1.33,cabin:[.10,1.04,.62],look:[-.15,.62,-.48]},
+  crossover:{file:'crossover',name:'BMW X6 M',height:1.57,cabin:[.10,1.23,.62],look:[-.15,.80,-.45]},
+  suv:{file:'suv',name:'Mercedes-Benz GLS',height:1.64,cabin:[.10,1.29,.65],look:[-.15,.85,-.45]}
+};
+const labels={restore:'Полировка · свет скользит по лаку',protect:'Плёнка · защита передней части',refresh:'Химчистка · материалы салона',interior:'Химчистка · материалы салона',glass:'Стёкла · очистка и защита',wheels:'Диски · глубокая очистка'};
+const modeIds={restore:0,protect:1,refresh:2,interior:2,glass:3,wheels:4};
 
-function makeMaps(shape) {
-  const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=800;
-  const ctx=canvas.getContext('2d');
-  ctx.fillStyle='#000';ctx.fillRect(0,0,1200,800);
-  const fill=(path,color)=>{ctx.fillStyle=color;ctx.fill(new Path2D(path));};
-  fill(shape.paint,'#f00');
-  shape.voids.forEach(path=>fill(path,'#000'));
-  shape.glass.forEach(path=>fill(path,'#0f0'));
-  shape.wheels.forEach(([x,y,rx,ry])=>{
-    ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(x,y,rx+10,ry+8,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#00f';ctx.beginPath();ctx.ellipse(x,y,rx*.88,ry*.86,0,0,Math.PI*2);ctx.fill();
-  });
-  const zones=new THREE.CanvasTexture(canvas);
-  zones.colorSpace=THREE.NoColorSpace;
-  const filmCanvas=document.createElement('canvas');filmCanvas.width=1200;filmCanvas.height=800;
-  const fc=filmCanvas.getContext('2d');
-  if(shape.filmPath){fc.fillStyle='white';fc.fill(new Path2D(shape.filmPath));}
-  const coverage=shape.filmPath?fc.getImageData(0,0,1200,800).data:null;
-  const pixels=ctx.getImageData(0,0,1200,800);
-  for(let i=0;i<pixels.data.length;i+=4){
-    const x=(i/4)%1200,y=Math.floor(i/4/1200);
-    const strength=coverage?pixels.data[i]*coverage[i+3]/255:y<(Math.min(shape.hood[0][1],shape.hood[1][1])-.02)*800?0:pixels.data[i]*Math.max(0,Math.min(1,(shape.front*1200-x)/20));
-    pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=strength;
-  }
-  fc.putImageData(pixels,0,0);
-  fc.fillStyle='white';fc.fill(new Path2D(shape.mirror));
-  const film=new THREE.CanvasTexture(filmCanvas);film.colorSpace=THREE.NoColorSpace;
-  return {zones,film};
-}
+export function createVehicleScene(stage,_images,onStatus){
+  const gsap=window.gsap;
+  const host=stage.querySelector('.vehicle-body');
+  const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
+  renderer.setClearColor(0x101a24,0);
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=.88;
+  const canvas=renderer.domElement;canvas.className='vehicle-canvas';canvas.setAttribute('aria-hidden','true');host.append(canvas);
+  const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(34,1,.025,60);
+  const target=new THREE.Vector3();
+  const pmrem=new THREE.PMREMGenerator(renderer),room=new RoomEnvironment();
+  const environment=pmrem.fromScene(room,.04);scene.environment=environment.texture;scene.environmentIntensity=.9;
+  room.dispose();pmrem.dispose();
+  const ambient=new THREE.HemisphereLight(0xe2f3ff,0x25322e,1.6);scene.add(ambient);
+  const keyLight=new THREE.DirectionalLight(0xfff4e7,2.2);keyLight.position.set(3,5,4);scene.add(keyLight);
+  const edgeLight=new THREE.DirectionalLight(0xb6d8ef,1.5);edgeLight.position.set(-3,2,-4);scene.add(edgeLight);
+  const cabinLight=new THREE.PointLight(0xffedcf,0,3,1.5);cabinLight.position.set(0,1.4,-.4);scene.add(cabinLight);
+  const shadowCanvas=document.createElement('canvas');shadowCanvas.width=128;shadowCanvas.height=256;
+  const ctx=shadowCanvas.getContext('2d');ctx.setTransform(64,0,0,128,64,128);const gradient=ctx.createRadialGradient(0,0,.08,0,0,1);
+  gradient.addColorStop(0,'rgba(0,0,0,.65)');gradient.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=gradient;ctx.fillRect(-1,-1,2,2);
+  const shadowTexture=new THREE.CanvasTexture(shadowCanvas),shadow=new THREE.Mesh(new THREE.PlaneGeometry(3.2,5.6),new THREE.MeshBasicMaterial({map:shadowTexture,transparent:true,depthWrite:false}));
+  shadow.rotation.x=-Math.PI/2;shadow.position.y=-.015;scene.add(shadow);
+  const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  const cache=new Map();
+  const fx={progress:{value:0},strength:{value:0},mode:{value:0}};
+  const pose={x:5,y:2.5,z:5,tx:0,ty:.65,tz:0,fov:34,door:0,light:0};
+  let current=null,record=null,timeline=null,queue=[],activeExtra=null,paused=false,visible=false,reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let disposed=false,lost=false,ticket=0,raf=0,frameCount=0,lastStatus=0,loading=false,drag=null;
+  let frameSamples=[],previousFrame=0,quality=Math.min(devicePixelRatio,matchMedia('(max-width:760px)').matches?1.35:1.75);
+  const metricsEnabled=new URLSearchParams(location.search).has('qa3d');
+  const metrics={frames:0,slowFrames:0,worstFrame:0};
 
-export function createVehicleScene(stage,images,onStatus) {
-  const canvas=document.createElement('canvas');
-  const context=canvas.getContext('webgl2',{alpha:true,antialias:true,powerPreference:'low-power'});
-  if(!context)throw new Error('WebGL unavailable');
-  const renderer=new THREE.WebGLRenderer({canvas,context,alpha:true,antialias:true});
-  renderer.outputColorSpace=THREE.SRGBColorSpace;
-  renderer.debug.onShaderError=()=>{throw new Error('Treatment renderer could not compile');};
-  canvas.className='vehicle-canvas';canvas.setAttribute('aria-hidden','true');
-  const host=stage.querySelector('.vehicle-models');
-  const body=host.querySelector('.vehicle-body');body.append(canvas);
-  const entry=host.querySelector('.vehicle-entry');
-  const interior=host.querySelector('.interior-detail');
-  const frame=interior.querySelector('.cabin-frame');
-  const cabinLight=interior.querySelector('.cabin-light');
-  const scene=new THREE.Scene();
-  const camera=new THREE.OrthographicCamera(-1.5,1.5,1,-1,.1,10);camera.position.z=5;
-  const geometry=new THREE.PlaneGeometry(3,2);
-  const cache=new Map(),gsap=window.gsap;
-  let current,record,programRecord,sideRecord,main,extra,swap,activeExtra=null,pending=[];
-  let visible=false,reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let request=0,lost=false,userPaused=false,disposed=false,ready=false;
-  const modeIds={restore:0,protect:1,refresh:2,interior:2,glass:3,wheels:4};
-  const labels={restore:'Полировка · восстановление блеска',protect:'Плёнка · сканирование передней части',refresh:'Салон · кожа, текстиль и детали',interior:'Салон · кожа, текстиль и детали',glass:'Стёкла · гидрофобная обработка',wheels:'Диски · очистка и защита'};
-  const filmMaterial=new THREE.ShaderMaterial({vertexShader:filmVertex,fragmentShader:filmFragment,uniforms:{uPeel:{value:0},uOpacity:{value:0}},transparent:true,depthWrite:false,side:THREE.DoubleSide});
-  const filmMesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1,32,24),filmMaterial);filmMesh.position.z=.1;filmMesh.renderOrder=3;scene.add(filmMesh);
-
-  function resetDetail(detail='body'){
-    const cabin=detail==='cabin';
-    if(gsap){
-      gsap.set([body,entry,frame],{clearProps:'transform'});
-      gsap.set(body,{opacity:cabin?0:1});gsap.set(entry,{opacity:0});
-      gsap.set(interior,{opacity:cabin?1:0});gsap.set(cabinLight,{opacity:0,xPercent:0});
-    }else{body.style.opacity=cabin?'0':'1';entry.style.opacity='0';interior.style.opacity=cabin?'1':'0';}
-    stage.dataset.detail=detail;
+  function report(label){
+    if(label)onStatus({label});
+    onStatus({playing:!!timeline,paused:paused&&!!timeline,progress:timeline?timeline.progress():1});
+    const playback=timeline?(paused?'paused':'playing'):'complete';if(stage.dataset.playback!==playback)stage.dataset.playback=playback;
   }
-  // Camera cuts and material animation share one timeline: pause, visibility and
-  // cancellation apply to every layer, including the transition into the cabin.
-  function addInterior(t,at=0){
-    t.call(()=>{stage.dataset.detail='entry';report('Обзор автомобиля · открываем салон');},[],at)
-      .to(body,{opacity:0,xPercent:-5,scale:.97,duration:.85,ease:'power2.inOut'},at)
-      .fromTo(entry,{opacity:0,xPercent:5,scale:.96},{opacity:1,xPercent:0,scale:1,duration:1.1,ease:'power2.inOut'},at)
-      .call(()=>{stage.dataset.detail='cabin';report('Переходим в салон');},[],at+1.9)
-      .to(entry,{opacity:0,scale:1.13,xPercent:-3,duration:1.15,ease:'power2.inOut'},at+1.9)
-      .to(interior,{opacity:1,duration:1.1,ease:'power2.inOut'},at+2.15)
-      .fromTo(frame,{scale:1.09},{scale:1,duration:2,ease:'power2.out'},at+2.15)
-      .call(()=>report(labels.interior),[],at+3.4)
-      .fromTo(cabinLight,{xPercent:-70,opacity:0},{xPercent:60,opacity:.65,duration:2,ease:'sine.inOut'},at+3.5)
-      .to(cabinLight,{opacity:0,duration:.5},at+5.1);
+  function applyPose(){
+    camera.position.set(pose.x,pose.y,pose.z);target.set(pose.tx,pose.ty,pose.tz);camera.lookAt(target);
+    if(camera.fov!==pose.fov){camera.fov=pose.fov;camera.updateProjectionMatrix();}
+    if(record){record.left.rotation.y=-pose.door;record.right.rotation.y=pose.door*.72;}
+    cabinLight.intensity=pose.light;const inside=THREE.MathUtils.clamp((pose.fov-43)/29,0,1);scene.environmentIntensity=.9-inside*.55;ambient.intensity=1.6-inside*1.1;keyLight.intensity=2.2-inside*1.5;edgeLight.intensity=1.5-inside;
   }
-  function draw(){if(!disposed&&!lost&&visible)renderer.render(scene,camera);}
-  function clock(){return extra||main||swap;}
-  function report(label){const t=clock();onStatus({playing:!!t&&t.progress()<1,paused:userPaused&&!!t,progress:t?t.progress():ready?1:0,label,reduced});}
-  function tick(){draw();report();}
-  function run(t){if(visible&&!document.hidden&&!userPaused)t.play();}
-  function fit(){
-    const width=host.clientWidth,height=host.clientHeight;if(!width||!height)return;
-    const ratio=Math.min(devicePixelRatio||1,2.5,Math.sqrt(2200000/(width*height)));
-    if(renderer.getPixelRatio()!==ratio)renderer.setPixelRatio(ratio);
-    renderer.setSize(width,height,false);
-    const aspect=width/height;
-    const halfW=aspect>1.5?aspect:1.5,halfH=aspect>1.5?1:1.5/aspect;
-    camera.left=-halfW;camera.right=halfW;camera.top=halfH;camera.bottom=-halfH;camera.updateProjectionMatrix();draw();
+  function draw(now){
+    raf=0;if(disposed||lost||!visible||document.hidden)return;
+    applyPose();renderer.render(scene,camera);frameCount++;
+    if(timeline&&!paused&&previousFrame){const delta=now-previousFrame;if(delta<150){frameSamples.push(delta);if(metricsEnabled){metrics.frames++;metrics.worstFrame=Math.max(metrics.worstFrame,delta);if(delta>34)metrics.slowFrames++;}}}
+    previousFrame=timeline&&!paused?now:0;
+    if(frameSamples.length>=50){const mean=frameSamples.reduce((a,b)=>a+b,0)/frameSamples.length;frameSamples=[];if(mean>26&&quality>1){quality=Math.max(1,quality-.25);resize();}}
+    if(now-lastStatus>100){lastStatus=now;report();}
+    if(metricsEnabled){stage.dataset.frames=String(frameCount);stage.dataset.calls=String(renderer.info.render.calls);stage.dataset.triangles=String(renderer.info.render.triangles);stage.dataset.renderStats=JSON.stringify(metrics);stage.dataset.memory=JSON.stringify(renderer.info.memory);}
   }
-  const resize=new ResizeObserver(fit);resize.observe(host);
-  function hood(shape){
-    const points=shape.hood,positions=filmMesh.geometry.attributes.position,uv=filmMesh.geometry.attributes.uv;
-    for(let i=0;i<positions.count;i++){
-      const u=uv.getX(i),v=uv.getY(i);
-      const top=[points[0][0]*(1-u)+points[1][0]*u,points[0][1]*(1-u)+points[1][1]*u];
-      const bottom=[points[2][0]*(1-u)+points[3][0]*u,points[2][1]*(1-u)+points[3][1]*u];
-      positions.setXYZ(i,(top[0]*(1-v)+bottom[0]*v-.5)*3,(.5-top[1]*(1-v)-bottom[1]*v)*2,.015*Math.sin(u*Math.PI));
+  function invalidate(){if(!raf&&visible&&!document.hidden&&!lost&&!disposed)raf=requestAnimationFrame(draw);}
+  function resize(){
+    const width=Math.round(host.clientWidth),height=Math.round(host.clientHeight);if(!width||!height)return;
+    const dpr=Math.min(quality,matchMedia('(max-width:760px)').matches?1.35:1.75,Math.sqrt(900000/(width*height)));
+    if(canvas.width!==Math.round(width*dpr)||canvas.height!==Math.round(height*dpr)){renderer.setPixelRatio(dpr);renderer.setSize(width,height,false);}
+    camera.aspect=width/height;camera.updateProjectionMatrix();invalidate();
+  }
+  const resizeObserver=new ResizeObserver(resize);resizeObserver.observe(host);
+  function decorate(material,surface,vehicle){
+    material.forceSinglePass=true;
+    if(surface==='interior'||/leather|fabric|plastic|rubber|carpet|wood|torped/i.test(material.name)){material.metalness=.04;material.roughness=Math.max(.58,material.roughness);}
+    if('transmission' in material)material.transmission=0;
+    if(surface==='paint')material=new THREE.MeshPhysicalMaterial({color:vehicle==='coupe'?0x062a1e:0x9aa7ae,metalness:.35,roughness:.38,clearcoat:.55,clearcoatRoughness:.28});
+    if(surface==='glass'){
+      material=material.clone();material.color.set(0xa1b4bd);material.transparent=true;material.opacity=.13;material.depthWrite=false;material.roughness=.11;material.metalness=.18;material.forceSinglePass=true;
     }
-    positions.needsUpdate=true;
+    const kind={paint:0,interior:2,glass:3,wheels:4}[surface]??5;
+    material.onBeforeCompile=shader=>{
+      shader.uniforms.atlasProgress=fx.progress;shader.uniforms.atlasStrength=fx.strength;shader.uniforms.atlasMode=fx.mode;
+      shader.vertexShader='varying vec3 vAtlasWorld;\n'+shader.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvAtlasWorld=(modelMatrix*vec4(transformed,1.0)).xyz;');
+      shader.fragmentShader=`varying vec3 vAtlasWorld;uniform float atlasProgress;uniform float atlasStrength;uniform float atlasMode;\n`+shader.fragmentShader.replace('#include <opaque_fragment>',`
+        float scan = mix(-2.5,2.5,atlasProgress);
+        float band = 1.0-smoothstep(.015,.16,abs(vAtlasWorld.z-scan));
+        float selected = ${kind===0?'1.0-step(1.5,atlasMode)':`1.0-step(.1,abs(atlasMode-${kind}.0))`};
+        float mirror = smoothstep(.90,1.0,abs(vAtlasWorld.x))*step(.8,vAtlasWorld.y)*step(vAtlasWorld.y,1.5)*step(.05,vAtlasWorld.z)*step(vAtlasWorld.z,.75);
+        float front = max(smoothstep(.35,.7,vAtlasWorld.z),mirror);
+        float film = (1.0-step(.1,abs(atlasMode-1.0)))*front;
+        vec3 light = mix(vec3(.35,.68,.85),vec3(.35,.9,1.0),film);
+        float grid = max(1.0-smoothstep(.03,.09,abs(fract(vAtlasWorld.x*13.0)-.5)),1.0-smoothstep(.03,.09,abs(fract(vAtlasWorld.z*13.0)-.5)));
+        outgoingLight += selected*atlasStrength*light*(band*.9+film*(band*.5+grid*.12));
+        #include <opaque_fragment>`);
+    };
+    material.customProgramCacheKey=()=>`atlas-surface-${kind}`;
+    return material;
   }
-  async function getRecord(vehicle,angle){
-    const key=vehicle+':'+angle;if(cache.has(key))return cache.get(key);
-    const image=images.find(item=>item.dataset.vehicle===vehicle&&item.dataset.angle===angle);await image.decode();
-    if(disposed)return null;if(cache.has(key))return cache.get(key);
-    const photo=new THREE.Texture(image);photo.colorSpace=THREE.SRGBColorSpace;
-    photo.generateMipmaps=false;photo.minFilter=THREE.LinearFilter;photo.magFilter=THREE.LinearFilter;photo.needsUpdate=true;
-    const shape=angle==='front'?frontSurfaces[vehicle]:surfaces[vehicle],maps=makeMaps(shape);
-    const wheel=([x,y,rx,ry])=>new THREE.Vector4(x/1200,y/800,rx/1200,ry/800);
-    const uniforms={uPhoto:{value:photo},uZones:{value:maps.zones},uFilm:{value:maps.film},uProgress:{value:1},uMode:{value:0},uProgram:{value:0},uFrontal:{value:angle==='front'?1:0},uOpacity:{value:0},uMotion:{value:reduced?0:1},uExtraMode:{value:-1},uExtraProgress:{value:1},uSelected:{value:new THREE.Vector3()},uPointer:{value:new THREE.Vector2()},uWheelA:{value:wheel(shape.wheels[0])},uWheelB:{value:wheel(shape.wheels[1])}};
-    const mesh=new THREE.Mesh(geometry,new THREE.ShaderMaterial({vertexShader,fragmentShader,uniforms,transparent:true,depthWrite:false}));mesh.visible=false;scene.add(mesh);
-    const value={mesh,uniforms,photo,shape,angle,...maps};cache.set(key,value);return value;
+  function disposeRecord(item){
+    const materials=new Set(),textures=new Set(),geometries=new Set();item.root.traverse(o=>{if(!o.isMesh)return;geometries.add(o.geometry);materials.add(o.material);for(const value of Object.values(o.material))if(value?.isTexture)textures.add(value);});
+    geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());textures.forEach(t=>{t.source?.data?.close?.();t.dispose();});
+    item.root.removeFromParent();
   }
-  function updateSelections(){
-    for(const value of [sideRecord,programRecord])if(value){
-      value.uniforms.uSelected.value.set(Number(current.extras.includes('glass')),Number(current.extras.includes('wheels')),Number(current.extras.includes('interior')));
-      value.uniforms.uProgram.value=modeIds[current.key];
+  async function loadModel(vehicle){
+    if(cache.has(vehicle)){const item=cache.get(vehicle);cache.delete(vehicle);cache.set(vehicle,item);return item;}
+    const data=await loader.loadAsync(`../assets/atlas-3d/${models[vehicle].file}.glb?v=12`);
+    const root=data.scene,materialCache=new Map();root.traverse(o=>{if(!o.isMesh)return;
+      const surface=o.userData.surface||o.parent?.userData.surface||'detail';
+      const key=o.material.uuid+'|'+surface;
+      if(!materialCache.has(key))materialCache.set(key,decorate(o.material,surface,vehicle));
+      o.material=materialCache.get(key);o.frustumCulled=true;
+    });
+    const item={root,left:root.getObjectByName('DoorLeft'),right:root.getObjectByName('DoorRight')};
+    if(disposed){disposeRecord(item);return null;}
+    cache.set(vehicle,item);
+    while(cache.size>2){const entry=[...cache.entries()].find(([,value])=>value!==record&&value!==item);if(!entry)break;cache.delete(entry[0]);disposeRecord(entry[1]);}
+    return item;
+  }
+  function kill(){if(timeline){timeline.kill();timeline=null;}fx.strength.value=0;previousFrame=0;activeExtra=null;}
+  function outside(){const h=models[current.vehicle].height;return{x:5.0,y:2.65,z:5.1,tx:0,ty:h*.46,tz:0,fov:34,door:0,light:0};}
+  function front(){return{...outside(),x:1.25,y:1.8,z:5.5,ty:.65,tz:.45,fov:32};}
+  function entrance(){return{...outside(),x:5.15,y:2.15,z:1.85,ty:models[current.vehicle].height*.57,fov:38,door:1.08,light:1.8};}
+  function cabin(){const c=models[current.vehicle];return{x:c.cabin[0],y:c.cabin[1],z:c.cabin[2],tx:c.look[0],ty:c.look[1],tz:c.look[2],fov:72,door:1.08,light:1.2};}
+  function restPose(){return current.key==='refresh'?entrance():current.key==='protect'?front():outside();}
+  function createTimeline(done){
+    previousFrame=0;
+    const t=gsap.timeline({paused:true,onUpdate:invalidate,onComplete:()=>{timeline=null;fx.strength.value=0;invalidate();done?.();report();}});timeline=t;return t;
+  }
+  function begin(t,label){report(label);stage.dataset.effect=activeExtra||current.key;if(visible&&!document.hidden&&!paused)t.play();invalidate();}
+  function setDetail(detail){stage.dataset.detail=detail;}
+  function addInterior(t){
+    t.call(()=>{setDetail('door');report('Салон · открываем передние двери');},[],0)
+     .to(pose,{...entrance(),door:0,duration:1.1,ease:'power2.inOut'},0)
+     .to(pose,{door:1.08,light:1.8,duration:1.15,ease:'power2.inOut'},.75)
+     .call(()=>{setDetail('enter');report('Салон · кожа, текстиль и детали');},[],2.25)
+     .to(pose,{x:1.65,y:models[current.vehicle].height*.8,z:.1,tx:0,ty:models[current.vehicle].height*.65,tz:.4,fov:60,duration:.8,ease:'power2.inOut'},2.25)
+     .to(pose,{...cabin(),duration:1.1,ease:'power2.inOut'},3.05)
+     .call(()=>setDetail('cabin'),[],4.15)
+     .to(fx.strength,{value:.55,duration:.6},3.65)
+     .to(fx.progress,{value:1,duration:2.3,ease:'none'},3.65)
+     .to(fx.strength,{value:0,duration:.5},5.7)
+     .to(pose,{...entrance(),duration:1.6,ease:'power2.inOut'},6.2)
+     .call(()=>setDetail('door'),[],7.8);
+  }
+  function animateEffect(effect,done){
+    kill();activeExtra=effect===current.key?null:effect;fx.mode.value=modeIds[effect];fx.progress.value=0;
+    if(reduced){Object.assign(pose,restPose());setDetail(current.key==='refresh'?'door':'body');invalidate();report('Состав выбран · модель можно повернуть');done?.();return;}
+    const t=createTimeline(done);setDetail('body');
+    if(effect==='refresh'||effect==='interior')addInterior(t);
+    else{
+      const dest=effect==='protect'?front():outside();
+      if(effect==='wheels')Object.assign(dest,{x:5.2,y:1.3,z:2.1,ty:.48,fov:36});
+      if(effect==='glass')Object.assign(dest,{x:3.3,y:2.8,z:4.3,ty:1,fov:34});
+      t.to(pose,{...dest,duration:1.15,ease:'power2.inOut'},0)
+       .to(fx.strength,{value:1,duration:.5},.9)
+       .to(fx.progress,{value:1,duration:effect==='protect'?3.7:2.7,ease:'none'},1.15)
+       .to(fx.strength,{value:0,duration:.55},effect==='protect'?4.3:3.35);
     }
+    begin(t,labels[effect]);
   }
-  function activate(value){
-    if(!value)return;record=value;
-    cache.forEach(item=>{item.mesh.visible=item===value;item.uniforms.uOpacity.value=item===value?1:0;item.mesh.position.x=0;item.mesh.scale.setScalar(1);});
-    hood(value.shape);stage.dataset.angle=value.angle;
+  function next(){
+    queue=queue.filter(extra=>current.extras.includes(extra)&&!(current.key==='refresh'&&extra==='interior'));
+    if(queue.length){animateEffect(queue.shift(),next);return;}
+    activeExtra=null;
+    if(reduced){Object.assign(pose,restPose());invalidate();report('Состав выбран · модель можно повернуть');return;}
+    const t=createTimeline(()=>{setDetail(current.key==='refresh'?'door':'body');report('Состав выбран · поверните модель');});
+    t.to(pose,{...restPose(),duration:.9,ease:'power2.inOut'});begin(t,'Возвращаемся к выбранной программе');
   }
-  function changeAngle(value,t){
-    const old=record;if(!old||old===value){activate(value);return 0;}
-    activate(value);old.mesh.visible=true;old.uniforms.uOpacity.value=1;value.uniforms.uOpacity.value=0;
-    t.to(old.uniforms.uOpacity,{value:0,duration:.55,ease:'power2.inOut'},0)
-      .to(value.uniforms.uOpacity,{value:1,duration:.8,ease:'power2.inOut'},0)
-      .fromTo(value.mesh.position,{x:.09},{x:0,duration:.8,ease:'power2.out'},0)
-      .call(()=>{old.mesh.visible=false;},[],.8);
-    return .8;
-  }
-  function killExtra(){
-    extra?.kill();extra=null;activeExtra=null;
-    cache.forEach(value=>{value.uniforms.uExtraMode.value=-1;value.uniforms.uExtraProgress.value=1;});
-  }
-  function cancel(){
-    main?.kill();main=null;swap?.kill();swap=null;killExtra();pending=[];
-    filmMaterial.uniforms.uOpacity.value=0;filmMaterial.uniforms.uPeel.value=0;
-  }
-  function finish(){
-    cancel();userPaused=false;activate(programRecord);
-    if(record){record.uniforms.uProgress.value=1;record.uniforms.uMotion.value=0;}
-    resetDetail(current?.key==='refresh'?'cabin':'body');draw();report('Состав выбран · можно сохранить расчёт');
-  }
-  function settle(){
-    const detail=current.key==='refresh'?'cabin':'body';
-    if(record===programRecord&&stage.dataset.detail===detail){report('Обработка показана · ваш состав готов');return;}
-    swap=gsap.timeline({paused:true,onUpdate:tick,onComplete:()=>{
-      swap=null;resetDetail(detail);draw();
-      if(pending.length)nextExtra();else report('Обработка показана · ваш состав готов');
-    }});
-    changeAngle(programRecord,swap);
-    swap.to(body,{opacity:detail==='body'?1:0,xPercent:0,scale:1,duration:.65,ease:'power2.inOut'},0)
-      .to(entry,{opacity:0,duration:.65},0)
-      .to(interior,{opacity:detail==='cabin'?1:0,duration:.65,ease:'power2.inOut'},0);
-    stage.dataset.detail=detail;report('Возвращаемся к выбранной программе');run(swap);
-  }
-  function nextExtra(){
-    if(!record||!ready||main||extra||swap||reduced||lost)return;
-    pending=pending.filter(key=>current.extras.includes(key)&&!(current.key==='refresh'&&key==='interior'));
-    const key=pending.shift();
-    if(!key){stage.dataset.effect=current.key;settle();return;}
-    activeExtra=key;stage.dataset.effect=key;
-    extra=gsap.timeline({paused:true,onUpdate:tick,onComplete:()=>{
-      extra=null;activeExtra=null;record.uniforms.uExtraMode.value=-1;record.uniforms.uExtraProgress.value=1;
-      draw();nextExtra();
-    }});
-    const wasCabin=stage.dataset.detail==='cabin';
-    const offset=changeAngle(key==='wheels'||key==='interior'?sideRecord:programRecord,extra);
-    resetDetail();
-    if(wasCabin){gsap.set(interior,{opacity:1});gsap.set(body,{opacity:0});extra.to(interior,{opacity:0,duration:.65},0).to(body,{opacity:1,duration:.65},0);}
-    const start=Math.max(offset,wasCabin ? .65 : 0),u=record.uniforms;
-    u.uExtraMode.value=modeIds[key];u.uExtraProgress.value=0;u.uMotion.value=1;
-    extra.fromTo(u.uExtraProgress,{value:0},{value:1,duration:key==='interior'?6.2:3.2,ease:'none'},start);
-    if(key==='interior')addInterior(extra,start);
-    report(labels[key]);run(extra);
-  }
-  function play(){
-    if(!programRecord||!current)return;
-    cancel();userPaused=false;ready=true;activate(programRecord);resetDetail();
-    if(reduced||lost||!gsap){finish();return;}
-    const u=record.uniforms,key=current.key;
-    u.uMode.value=modeIds[key];u.uProgress.value=0;u.uMotion.value=1;
-    pending=current.extras.filter(item=>!(key==='refresh'&&item==='interior'));stage.dataset.effect=key;
-    main=gsap.timeline({paused:true,onUpdate:tick,onComplete:()=>{
-      main=null;u.uProgress.value=1;filmMaterial.uniforms.uOpacity.value=0;draw();nextExtra();
-    }});
-    main.fromTo(u.uProgress,{value:0},{value:1,duration:key==='protect'?5.8:key==='restore'?4.6:6.2,ease:'none'},0);
-    if(key==='protect'){
-      main.set(filmMaterial.uniforms.uPeel,{value:1},0)
-        .fromTo(filmMaterial.uniforms.uOpacity,{value:0},{value:1,duration:.7},.3)
-        .to(filmMaterial.uniforms.uPeel,{value:0,duration:3.4,ease:'power2.inOut'},.9)
-        .to(filmMaterial.uniforms.uOpacity,{value:0,duration:.8},4.5);
+  function play(){if(!record||loading)return;paused=false;metrics.frames=0;metrics.slowFrames=0;metrics.worstFrame=0;queue=current.extras.filter(e=>!(current.key==='refresh'&&e==='interior'));animateEffect(current.key,next);}
+  async function update(nextState){
+    const previous=current;current={...nextState,extras:[...nextState.extras]};
+    const changedModel=!previous||previous.vehicle!==current.vehicle;
+    const changedProgram=!previous||previous.key!==current.key;
+    if(!changedModel&&!changedProgram){
+      const added=current.extras.filter(e=>!previous.extras.includes(e)&&!(current.key==='refresh'&&e==='interior'));
+      queue=queue.filter(e=>current.extras.includes(e));queue.push(...added.filter(e=>!queue.includes(e)));
+      if(activeExtra&&!current.extras.includes(activeExtra)){kill();next();}
+      else if(!timeline&&!loading&&queue.length)next();
+      return;
     }
-    if(key==='refresh')addInterior(main);
-    report(labels[key]);run(main);
+    kill();queue=[];paused=false;
+    if(changedModel){
+      const version=++ticket;loading=true;stage.dataset.loading='true';report('Загружаем 3D-модель…');
+      try{
+        const item=await loadModel(current.vehicle);if(version!==ticket||disposed)return;
+        record?.root.removeFromParent();record=item;scene.add(record.root);
+        Object.assign(pose,outside());applyPose();resize();
+        await renderer.compileAsync(scene,camera);
+        if(version!==ticket||disposed)return;
+        loading=false;stage.dataset.loading='false';stage.dataset.renderer='webgl';
+        stage.dataset.model=models[current.vehicle].name;onStatus({unavailable:false,model:models[current.vehicle].name});
+        invalidate();play();
+      }catch(error){if(version!==ticket||disposed)return;loading=false;stage.dataset.loading='false';stage.dataset.renderer='fallback';onStatus({unavailable:true,label:'3D недоступно · расчёт продолжает работать'});console.warn('ATLAS: model could not load',error);}
+    }else if(!loading)play();
   }
-  async function update(next){
-    const previous=current,sameScene=previous?.vehicle===next.vehicle&&previous?.key===next.key;
-    current={...next,extras:[...next.extras]};
-    if(sameScene){
-      updateSelections();
-      if(ready){
-        pending=pending.filter(key=>next.extras.includes(key));
-        const added=next.extras.filter(key=>!previous.extras.includes(key)&&!(next.key==='refresh'&&key==='interior'));
-        pending=[...new Set([...pending,...added])];
-        if(activeExtra&&!next.extras.includes(activeExtra)){killExtra();activate(programRecord);resetDetail(current.key==='refresh'?'cabin':'body');report();}
-        if(!reduced)nextExtra();
-      }
-      draw();return;
-    }
-    const ticket=++request;ready=false;cancel();userPaused=false;resetDetail();
-    const ownImages=[...host.querySelectorAll(`.scene-vehicle-image[data-vehicle="${next.vehicle}"]`)];
-    const [side,front]=await Promise.all([getRecord(next.vehicle,'side'),getRecord(next.vehicle,'front'),...ownImages.map(image=>image.decode())]);
-    if(ticket!==request||disposed||!side||!front)return;
-    sideRecord=side;programRecord=current.key==='protect'?front:side;updateSelections();
-    programRecord.uniforms.uMode.value=modeIds[current.key];programRecord.uniforms.uProgress.value=1;
-    stage.dataset.renderer='webgl';fit();
-    if(record&&record!==programRecord&&visible&&!reduced&&gsap){
-      swap=gsap.timeline({paused:true,onUpdate:tick,onComplete:()=>{swap=null;play();}});
-      changeAngle(programRecord,swap);report('Меняем ракурс автомобиля');run(swap);
-    }else{activate(programRecord);play();}
-    draw();
+  function syncVisibility(){
+    if(!visible||document.hidden){timeline?.pause();if(raf)cancelAnimationFrame(raf);raf=0;previousFrame=0;}
+    else{if(!paused)timeline?.resume();invalidate();}
   }
-  function setVisible(value){
-    visible=value;
-    if(!value||document.hidden){main?.pause();extra?.pause();swap?.pause();return;}
-    fit();if(!userPaused&&!reduced){main?.resume();extra?.resume();swap?.resume();}draw();
+  function setVisible(value){visible=value;syncVisibility();}
+  document.addEventListener('visibilitychange',syncVisibility);
+  function setReduced(value){reduced=value;kill();queue=[];paused=false;if(record&&current){Object.assign(pose,restPose());setDetail(current.key==='refresh'?'door':'body');invalidate();report('Состав выбран · модель можно повернуть');}}
+  function toggle(){if(loading)return;if(!timeline){play();return;}paused=!paused;syncVisibility();if(paused)timeline.pause();report();}
+  function stopForInspection(){kill();queue=[];paused=false;fx.strength.value=0;setDetail('inspect');report('Осмотр модели · вращайте мышью или пальцем');}
+  function rotate(dx,dy){
+    const delta=new THREE.Vector3(pose.x-pose.tx,pose.y-pose.ty,pose.z-pose.tz),s=new THREE.Spherical().setFromVector3(delta);
+    s.theta-=dx*.009;s.phi=THREE.MathUtils.clamp(s.phi+dy*.006,.45,Math.PI*.48);s.radius=Math.max(4.4,s.radius);
+    delta.setFromSpherical(s);pose.x=pose.tx+delta.x;pose.y=pose.ty+delta.y;pose.z=pose.tz+delta.z;invalidate();
   }
-  function setReduced(value){reduced=value;if(value)finish();else if(visible)play();}
-  function toggle(){
-    if(!clock()){play();return;}
-    userPaused=!userPaused;
-    if(userPaused){main?.pause();extra?.pause();swap?.pause();}else if(visible&&!document.hidden){main?.resume();extra?.resume();swap?.resume();}
-    report();
-  }
-  function pointer(x,y){if(!record||reduced)return;record.uniforms.uPointer.value.set(x,y);draw();}
-  function visibility(){setVisible(visible);}
-  document.addEventListener('visibilitychange',visibility);
-  canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();lost=true;main?.pause();extra?.pause();swap?.pause();stage.dataset.renderer='fallback';onStatus({unavailable:true});});
-  canvas.addEventListener('webglcontextrestored',()=>{lost=false;stage.dataset.renderer='webgl';onStatus({unavailable:false});fit();play();});
-  return {update,setVisible,setReduced,toggle,pointer,dispose(){disposed=true;request++;cancel();resize.disconnect();document.removeEventListener('visibilitychange',visibility);cache.forEach(value=>{value.photo.dispose();value.zones.dispose();value.film.dispose();value.mesh.material.dispose();});geometry.dispose();filmMesh.geometry.dispose();filmMaterial.dispose();renderer.dispose();canvas.remove();}};
+  function pointerDown(event){if(!record||loading||event.button!==0)return;drag={x:event.clientX,y:event.clientY,moved:false};canvas.setPointerCapture(event.pointerId);}
+  function pointerMove(event){if(!drag)return;const dx=event.clientX-drag.x,dy=event.clientY-drag.y;if(!drag.moved){if(Math.abs(dx)+Math.abs(dy)<3)return;stopForInspection();drag.moved=true;if(pose.fov>60)Object.assign(pose,entrance());}rotate(dx,dy);drag.x=event.clientX;drag.y=event.clientY;}
+  function pointerUp(){drag=null;}
+  canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp);
+  function keydown(event){if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home'].includes(event.key)||!record)return;event.preventDefault();stopForInspection();if(event.key==='Home'){Object.assign(pose,restPose());invalidate();return;}if(pose.fov>60)Object.assign(pose,entrance());rotate(event.key==='ArrowLeft'?-18:event.key==='ArrowRight'?18:0,event.key==='ArrowUp'?-12:event.key==='ArrowDown'?12:0);}
+  stage.addEventListener('keydown',keydown);
+  function contextLost(event){event.preventDefault();lost=true;kill();stage.dataset.renderer='fallback';onStatus({unavailable:true,label:'3D недоступно · расчёт продолжает работать'});}
+  canvas.addEventListener('webglcontextlost',contextLost);
+  return {update,setVisible,setReduced,toggle,dispose(){disposed=true;ticket++;kill();cancelAnimationFrame(raf);resizeObserver.disconnect();document.removeEventListener('visibilitychange',syncVisibility);stage.removeEventListener('keydown',keydown);cache.forEach(disposeRecord);cache.clear();shadow.geometry.dispose();shadow.material.dispose();shadowTexture.dispose();environment.dispose();renderer.dispose();canvas.remove();}};
 }
