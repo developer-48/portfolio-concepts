@@ -84,4 +84,9 @@ const brews={filter:{title:'Чашка с ясным вкусом.',copy:'Смо
 function renderBrew(key){const b=brews[key];const panel=document.getElementById('brew-info');panel.innerHTML='<h3></h3><p></p><div class="brew-measures"></div>';panel.querySelector('h3').textContent=b.title;panel.querySelector('p').textContent=b.copy;b.values.forEach((value,i)=>{const div=document.createElement('div');const num=document.createElement('b'),label=document.createElement('span');num.textContent=value;label.textContent=b.labels[i];div.append(num,label);panel.querySelector('.brew-measures').append(div);});}
 document.querySelectorAll('[data-brew]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('[data-brew]').forEach(x=>x.setAttribute('aria-pressed',String(x===button)));renderBrew(button.dataset.brew);}));
   renderBrew('filter');
+  if(window.gsap&&window.ScrollTrigger){
+    gsap.matchMedia().add('(prefers-reduced-motion: no-preference)',()=>{
+      gsap.to('.word-band div',{xPercent:-20,ease:'none',scrollTrigger:{trigger:'.word-band',start:'top bottom',end:'bottom top',scrub:1}});
+    });
+  }
 })();
