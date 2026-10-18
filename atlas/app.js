@@ -2,6 +2,11 @@
   const $ = selector => document.querySelector(selector);
   const money = value => new Intl.NumberFormat('ru-RU').format(value) + ' ₽';
   const icon = Studio.icon;
+  // Native lazy-loading may fetch photos several screens away on slow networks.
+  // Start these secondary images only when their own block is approaching.
+  const imageObserver='IntersectionObserver' in window?new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){const image=entry.target;image.src=image.dataset.src;delete image.dataset.src;imageObserver.unobserve(image);}},{rootMargin:'200px'}):null;
+  function observeImage(image){if(!image?.dataset.src)return;if(imageObserver)imageObserver.observe(image);else{image.src=image.dataset.src;delete image.dataset.src;}}
+  document.querySelectorAll('img[data-src]').forEach(observeImage);
   const services = {
     film: {title:'Защита, которая остаётся незаметной.',text:'Плёнка на участках, которые первыми встречают дорогу. Подготовка, точная посадка на геометрию детали и аккуратная обработка краёв.',image:'../assets/atlas-v9/film.webp',alt:'Укладка прозрачной защитной плёнки на капот зелёного Porsche 911',caption:'01 / Защита кузова',items:['Подбор зон и материала','Очистка и подготовка поверхности','Оклейка и контроль прилегания'],price:85000,time:'3–4 дня',href:'protection.html'},
     polish: {title:'Глубина цвета. Чистота отражений.',text:'Перед коррекцией оценивают лак и характер дефектов. Подход и интенсивность работы подбираются для конкретной поверхности.',image:'../assets/atlas-v9/polish.webp',alt:'Полировка капота Porsche 911 машинкой с мягким кругом',caption:'02 / Восстановление блеска',items:['Оценка состояния лакокрасочного покрытия','Согласование степени коррекции','Финишная обработка и контроль света'],price:24000,time:'1–2 дня',href:'paint.html'},
@@ -11,7 +16,9 @@
   function renderService(key){
     const item=services[key]; if(!item||!$('#a-service-panel'))return;
     document.querySelectorAll('[data-service]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.service===key)));
-    $('#a-service-panel').innerHTML=`<div class="service-image"><img src="${item.image}" alt="${item.alt}" width="1536" height="1024" loading="lazy" fetchpriority="low"><span>${item.caption}</span></div><div class="service-description"><h3>${item.title}</h3><p>${item.text}</p><ul>${item.items.map(text=>`<li>${icon('check')}${text}</li>`).join('')}</ul><div class="service-facts"><div><small>Демонстрационная цена</small><b>от ${money(item.price)}</b></div><div><small>Ориентир по времени</small><b>${item.time}</b></div></div><a class="a-button secondary" href="${item.href}">Разобраться в услуге<span>${icon('layers')}</span></a></div>`;
+    const previous=$('#a-service-panel img');if(previous)imageObserver?.unobserve(previous);
+    $('#a-service-panel').innerHTML=`<div class="service-image"><img data-src="${item.image}" alt="${item.alt}" width="1536" height="1024" loading="lazy" fetchpriority="low"><span>${item.caption}</span></div><div class="service-description"><h3>${item.title}</h3><p>${item.text}</p><ul>${item.items.map(text=>`<li>${icon('check')}${text}</li>`).join('')}</ul><div class="service-facts"><div><small>Демонстрационная цена</small><b>от ${money(item.price)}</b></div><div><small>Ориентир по времени</small><b>${item.time}</b></div></div><a class="a-button secondary" href="${item.href}">Разобраться в услуге<span>${icon('layers')}</span></a></div>`;
+    observeImage($('#a-service-panel img'));
     if(window.gsap&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
       const photo=$('#a-service-panel .service-image img');
       gsap.fromTo(photo,{opacity:.35,scale:1.035},{opacity:1,scale:1,duration:.7,ease:'power2.out'});

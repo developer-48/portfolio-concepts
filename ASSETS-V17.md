@@ -32,3 +32,5 @@ Related implementation references: [meshoptimizer simplifier](https://github.com
 ### First-scene priority follow-up
 
 The page preloads the renderer and local Draco decoder at High priority from its head. Service/process/interior photographs are lazy and Low priority. This removes the previous low-priority renderer request competing with offscreen photographs. Controller and page script revision: 17.1; model, poster and renderer revision remain 17, preserving the cache for unchanged model bytes.
+
+Secondary photographs additionally wait until their own section is within 200px of the viewport, rather than relying on the browser's broad native lazy-loading margin. App revision 17.2. Hero and all four car posters keep their normal eager loading.
