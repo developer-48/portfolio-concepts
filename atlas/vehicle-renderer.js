@@ -1,7 +1,9 @@
 import * as THREE from '../shared/three/three.module.min.js';
 import {GLTFLoader} from '../shared/three/GLTFLoader.js';
 import {DRACOLoader} from '../shared/three/DRACOLoader.js';
-import {requestModel} from './model-data.js?v=18';
+import {requestModel} from './model-data.js?v=19';
+
+import {createRebuiltMaterial} from './vehicle-materials.js';
 
 import {resolveVisualEffect} from './visual-state.mjs';
 
@@ -93,6 +95,7 @@ export function createVehicleScene(stage,_images,onStatus){
   }
   const resizeObserver=new ResizeObserver(resize);resizeObserver.observe(host);
   function decorate(material,surface,vehicle){
+    if(vehicle==='coupe'){
     if(vehicle!=='coupe')material=material.clone();
     const name=material.name||'';
     material.forceSinglePass=true;
@@ -122,12 +125,13 @@ export function createVehicleScene(stage,_images,onStatus){
     if(surface==='trim'){material.color.set(0x12171b);material.metalness=.2;material.roughness=.3;}
     if(surface==='lens'||surface==='rear-lens'){material.color.set(surface==='rear-lens'?0xc52022:0xffffff);material.opacity=surface==='rear-lens'?.75:.18;material.transparent=true;material.depthWrite=false;material.roughness=.09;material.metalness=0;}
     if(surface==='mirror'){material.color.set(0xb4bcc2);material.opacity=1;material.transparent=false;material.depthWrite=true;material.metalness=1;material.roughness=.12;}
+    }else material=createRebuiltMaterial(material,surface,vehicle);
     const kind={paint:0,interior:2,glass:3,'roof-glass':3,wheels:4}[surface]??5;
     material.onBeforeCompile=shader=>{
       shader.uniforms.atlasProgress=fx.progress;shader.uniforms.atlasStrength=fx.strength;shader.uniforms.atlasMode=fx.mode;
       shader.vertexShader='varying vec3 vAtlasWorld;\n'+shader.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvAtlasWorld=(modelMatrix*vec4(transformed,1.0)).xyz;');
       shader.fragmentShader=`varying vec3 vAtlasWorld;uniform float atlasProgress;uniform float atlasStrength;uniform float atlasMode;\n`+shader.fragmentShader.replace('#include <opaque_fragment>',`
-        ${surface==='glass'?`diffuseColor.a *= mix(${vehicle==='coupe'?'.2,1.8':'.8,1.35'},pow(1.0-abs(dot(normal,normalize(vViewPosition))),3.0));`:''}
+        ${surface==='glass'&&vehicle==='coupe'?`diffuseColor.a *= mix(${vehicle==='coupe'?'.2,1.8':'.8,1.35'},pow(1.0-abs(dot(normal,normalize(vViewPosition))),3.0));`:''}
         float scan = mix(-2.5,2.5,atlasProgress);
         float band = 1.0-smoothstep(.015,.16,abs(vAtlasWorld.z-scan));
         float selected = ${kind===0?'1.0-step(1.5,atlasMode)':`1.0-step(.1,abs(atlasMode-${kind}.0))`};

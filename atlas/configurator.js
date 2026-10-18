@@ -32,14 +32,14 @@
     button.hidden=reduce.matches&&!unavailable;
   }
   function prepare(){
-    transport??=import('./model-data.js?v=18');
-    if(!primed){const link=document.createElement('link');link.rel='modulepreload';link.href='./vehicle-scene.min.js?v=18';link.fetchPriority='high';document.head.append(link);primed=true;}
+    transport??=import('./model-data.js?v=19');
+    if(!primed){const link=document.createElement('link');link.rel='modulepreload';link.href='./vehicle-scene.min.js?v=19';link.fetchPriority='high';document.head.append(link);primed=true;}
     transport.then(({requestModel})=>requestModel(current?.vehicle||'coupe')).catch(()=>{});
   }
   const afterPaint=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   async function load(){
     if(loading||engine)return loading;
-    prepare();loading=import('./vehicle-scene.min.js?v=18').then(async({createVehicleScene})=>{
+    prepare();loading=import('./vehicle-scene.min.js?v=19').then(async({createVehicleScene})=>{
       // The selected predecoded poster gets a paint before WebGL setup starts.
       await afterPaint();engine=createVehicleScene(stage,[],status);engine.setVisible(visible);if(current)await engine.update(current);
     }).catch(error=>{stage.dataset.renderer='fallback';status({unavailable:true,ready:false,label:'Изображение автомобиля · 3D недоступно'});engine?.dispose();engine=null;console.warn('ATLAS: 3D initialization failed',error);}).finally(()=>{loading=null;});

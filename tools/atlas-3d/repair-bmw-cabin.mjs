@@ -65,12 +65,7 @@ export function cabinShell(cx,cz,width,length,bottom,top,bevel=.025){
   return {positions,indices};
 }
 
-export async function repairBMW(input,output){
-  const io=new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
-    'draco3d.decoder':await draco3d.createDecoderModule(),
-    'draco3d.encoder':await draco3d.createEncoderModule()
-  });
-  const doc=await io.read(input);await doc.transform(dequantize());
+export function addBMWCabin(doc){
   const root=doc.getRoot(),buffer=root.listBuffers()[0];
   if(root.listNodes().some(n=>n.getExtras().repair==='bmw-cabin-v18'))throw new Error('Cabin repair is already applied');
   const paint=doc.createMaterial('BMW inner painted door shell').setBaseColorFactor([.03,.055,.085,1]).setMetallicFactor(.28).setRoughnessFactor(.42).setDoubleSided(true);
@@ -100,6 +95,16 @@ export async function repairBMW(input,output){
   for(const sign of [-1,1]){
     add(body,sign>0?'Driver seat plinth':'Passenger seat plinth',cabinShell(sign*.435,.005,.455,.61,.385,.555,.055),base,'interior');
   }
+  return doc;
+}
+
+export async function repairBMW(input,output){
+  const io=new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
+    'draco3d.decoder':await draco3d.createDecoderModule(),
+    'draco3d.encoder':await draco3d.createEncoderModule()
+  });
+  const doc=await io.read(input);await doc.transform(dequantize());
+  addBMWCabin(doc);
   await doc.transform(prune(),dedup(),draco({method:'edgebreaker',encodeSpeed:0,decodeSpeed:5,quantizePosition:14,quantizeNormal:12,quantizeTexcoord:12}));
   const binary=await io.writeBinary(doc),packed=gzipSync(binary,{level:9});
   await fs.writeFile(output,binary);await fs.writeFile(output+'.gz',packed);

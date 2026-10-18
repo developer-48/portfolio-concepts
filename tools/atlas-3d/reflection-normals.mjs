@@ -3,7 +3,7 @@ import {Vector3,Matrix4} from 'three';
 // Spatial bilateral filtering of reflection normals, in model/world units.
 // Positions, topology, UVs and silhouettes are unchanged. An angular gate keeps
 // neighbouring panels with different orientations from blending into each other.
-export function filterReflectionNormals(positions,normals,{radius=.18,passes=3}={}){
+export function filterReflectionNormals(positions,normals,{radius=.18,passes=3,minimumDot=.85}={}){
  const entries=[],unique=new Map(),grid=new Map(),radius2=radius*radius;
  for(let i=0;i<positions.length;i+=3){
   const point=new Vector3().fromArray(positions,i),normal=new Vector3().fromArray(normals,i).normalize();
@@ -19,8 +19,8 @@ export function filterReflectionNormals(positions,normals,{radius=.18,passes=3}=
    for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++){
     for(const index of grid.get([cell[0]+x,cell[1]+y,cell[2]+z].join(','))||[]){
      const other=entries[index],distance=entry.point.distanceToSquared(other.point),dot=entry.normal.dot(other.normal);
-     if(distance>radius2||dot<.85)continue;
-     const weight=Math.exp(-distance/(radius2*.3))*Math.pow((dot-.85)/.15,2);sum.addScaledVector(other.normal,weight);
+     if(distance>radius2||dot<minimumDot)continue;
+     const weight=Math.exp(-distance/(radius2*.3))*Math.pow((dot-minimumDot)/(1-minimumDot),2);sum.addScaledVector(other.normal,weight);
     }
    }return sum.lengthSq()>1e-12?sum.normalize():entry.normal.clone();
   });entries.forEach((entry,index)=>entry.normal=output[index]);
