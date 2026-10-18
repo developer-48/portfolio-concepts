@@ -8,12 +8,13 @@ for(const vehicle of ['coupe','sedan','crossover','suv'])test(`${vehicle}: self-
  assert.equal(data.toString('ascii',0,4),'glTF');assert.equal(data.readUInt32LE(4),2);assert.equal(data.readUInt32LE(8),data.length);
  assert.ok(data.length<1.75*1024*1024,'model exceeds geometry budget');
  const packed=fs.readFileSync(path.join(__dirname,'../assets/atlas-3d',vehicle+'.glb.gz'));
- assert.ok(packed.length<1.3*1024*1024,'model exceeds download budget');
+ assert.ok(packed.length<1.1*1024*1024,'model exceeds download budget');
  assert.deepEqual(gunzipSync(packed),data,'compressed and fallback models must match');
  const poster=fs.readFileSync(path.join(__dirname,'../assets/atlas-3d',vehicle+'-poster.webp'));
  assert.equal(poster.toString('ascii',8,12),'WEBP');assert.ok(poster.length<80000,'poster must be lightweight');
  const gltf=JSON.parse(data.subarray(20,20+data.readUInt32LE(12)).toString());
  assert.match(gltf.asset.extras.license,/CC-BY-4.0/);
+ assert.ok(gltf.extensionsRequired.includes('KHR_draco_mesh_compression'),'model must use the worker-decoded compact transport');
  assert.ok(gltf.asset.extras.source.startsWith('https://sketchfab.com/'));
  for(const name of ['DoorLeft','DoorRight']){
   const door=gltf.nodes.find(n=>n.name===name);assert.ok(door?.children?.length>0,`${name} must have geometry`);
@@ -33,4 +34,10 @@ for(const vehicle of ['coupe','sedan','crossover','suv'])test(`${vehicle}: self-
  for(const resource of [...gltf.buffers,...(gltf.images||[])])assert.equal(resource.uri,undefined,'all resources must be embedded');
  const triangles=gltf.meshes.flatMap(m=>m.primitives).reduce((n,p)=>n+gltf.accessors[p.indices].count/3,0);
  assert.ok(triangles>20000&&triangles<190000,`unexpected geometry budget: ${triangles}`);
+});
+
+test('the decoder is local and ships its license',()=>{
+ const base=path.join(__dirname,'../shared/three/draco');
+ assert.deepEqual([...fs.readFileSync(path.join(base,'draco_decoder.wasm')).subarray(0,4)],[0,97,115,109]);
+ for(const name of ['draco_wasm_wrapper.js','draco_decoder.js','LICENSE'])assert.ok(fs.statSync(path.join(base,name)).size>100);
 });

@@ -1,7 +1,7 @@
 import * as THREE from '../shared/three/three.module.min.js';
 import {GLTFLoader} from '../shared/three/GLTFLoader.js';
-import {MeshoptDecoder} from '../shared/three/meshopt_decoder.module.js';
-import {requestModel} from './model-data.js?v=15';
+import {DRACOLoader} from '../shared/three/DRACOLoader.js';
+import {requestModel} from './model-data.js?v=16';
 
 import {resolveVisualEffect} from './visual-state.mjs';
 
@@ -49,7 +49,9 @@ export function createVehicleScene(stage,_images,onStatus){
   gradient.addColorStop(0,'rgba(0,0,0,.65)');gradient.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=gradient;ctx.fillRect(-1,-1,2,2);
   const shadowTexture=new THREE.CanvasTexture(shadowCanvas),shadow=new THREE.Mesh(new THREE.PlaneGeometry(3.2,5.6),new THREE.MeshBasicMaterial({map:shadowTexture,transparent:true,depthWrite:false}));
   shadow.rotation.x=-Math.PI/2;shadow.position.y=-.015;scene.add(shadow);
-  const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  const draco=new DRACOLoader().setDecoderPath(new URL('../shared/three/draco/',import.meta.url).href).setWorkerLimit(2);
+  draco.preload();
+  const loader=new GLTFLoader().setDRACOLoader(draco);
   const cache=new Map(),pendingModels=new Map();
   const fx={progress:{value:0},strength:{value:0},mode:{value:0}};
   const pose={x:5,y:2.5,z:5,tx:0,ty:.65,tz:0,fov:34,door:0,light:0};
@@ -150,19 +152,20 @@ export function createVehicleScene(stage,_images,onStatus){
       if(disposed||current?.vehicle!==vehicle||!loading)return;
       onStatus({progress:ratio,label:ratio===1?'Готовим объёмную сцену…':ratio?`Загружаем 3D-модель · ${Math.round(ratio*100)}%`:'Загружаем 3D-модель…'});
     };
-    const buffer=await requestModel(vehicle,progress).catch(error=>{
-      if(error.name==='AbortError'&&current?.vehicle===vehicle&&!disposed)return requestModel(vehicle,progress);
-      throw error;
-    });
+    const downloadStarted=performance.now();
+    const buffer=await requestModel(vehicle,progress);
+    const downloadMs=performance.now()-downloadStarted;
     if(disposed)return null;
+    const decodeStarted=performance.now();
     const data=await loader.parseAsync(buffer,'');
+    const decodeMs=performance.now()-decodeStarted;
     const root=data.scene,materialCache=new Map();root.traverse(o=>{if(!o.isMesh)return;
       const surface=o.userData.surface||o.parent?.userData.surface||'detail';
       const key=o.material.uuid+'|'+surface;
       if(!materialCache.has(key))materialCache.set(key,decorate(o.material,surface,vehicle));
       o.material=materialCache.get(key);o.frustumCulled=true;o.castShadow=!['glass','roof-glass'].includes(surface)&&!o.material.transparent;o.receiveShadow=surface==='interior';
     });
-    const item={root,left:root.getObjectByName('DoorLeft'),right:root.getObjectByName('DoorRight')};
+    const item={root,downloadMs,decodeMs,left:root.getObjectByName('DoorLeft'),right:root.getObjectByName('DoorRight')};
     if(disposed){disposeRecord(item);return null;}
     cache.set(vehicle,item);
     while(cache.size>cacheLimit){const entry=[...cache.entries()].find(([,value])=>value!==record&&value!==item);if(!entry)break;cache.delete(entry[0]);disposeRecord(entry[1]);}
@@ -224,6 +227,7 @@ export function createVehicleScene(stage,_images,onStatus){
   }
   function play(effect=current.key){if(!record||loading)return;paused=false;metrics.frames=0;metrics.slowFrames=0;metrics.worstFrame=0;animateEffect(effect,finish);}
   async function update(nextState){
+    if(lost){onStatus({unavailable:true,ready:false,label:'Изображение автомобиля · 3D недоступно'});return;}
     const previous=current;current={...nextState,extras:[...nextState.extras]};
     const changedModel=!previous||previous.vehicle!==current.vehicle;
     const changedProgram=!previous||previous.key!==current.key;
@@ -232,19 +236,20 @@ export function createVehicleScene(stage,_images,onStatus){
     if(!changedModel&&!changedProgram){if(effect&&!loading)play(effect);return;}
     kill();paused=false;
     if(changedModel){
-      const version=++ticket,loadStarted=performance.now();loading=true;stage.dataset.loading='true';report('Загружаем 3D-модель…');onStatus({progress:0});
+      const version=++ticket,loadStarted=performance.now();loading=true;stage.dataset.loading='true';onStatus({ready:false,vehicle:current.vehicle});report('Загружаем 3D-модель…');onStatus({progress:0});
       try{
         const item=await loadModel(current.vehicle);if(version!==ticket||disposed)return;
         record?.root.removeFromParent();record=item;scene.add(record.root);renderer.shadowMap.needsUpdate=true;shadowDoor=-1;
         Object.assign(pose,outside());applyPose();resize();
+        onStatus({label:'Готовим 3D · изображение уже доступно'});
         const compileStarted=performance.now();if(!item.compiled){await renderer.compileAsync(scene,camera);item.compiled=true;}
-        if(metricsEnabled){stage.dataset.compileMs=String(Math.round(performance.now()-compileStarted));stage.dataset.loadMs=String(Math.round(performance.now()-loadStarted));stage.dataset.readyMs=String(Math.round(performance.now()));}
+        if(metricsEnabled){stage.dataset.downloadMs=String(Math.round(item.downloadMs));stage.dataset.decodeMs=String(Math.round(item.decodeMs));stage.dataset.compileMs=String(Math.round(performance.now()-compileStarted));stage.dataset.loadMs=String(Math.round(performance.now()-loadStarted));stage.dataset.readyMs=String(Math.round(performance.now()));}
         if(version!==ticket||disposed)return;
         loading=false;stage.dataset.loading='false';
         applyPose();renderer.render(scene,camera);stage.dataset.renderer='webgl';
-        stage.dataset.model=models[current.vehicle].name;onStatus({unavailable:false,model:models[current.vehicle].name});
+        stage.dataset.model=models[current.vehicle].name;onStatus({unavailable:false,ready:true,vehicle:current.vehicle,model:models[current.vehicle].name});
         invalidate();play(requestedEffect);
-      }catch(error){if(version!==ticket||disposed)return;loading=false;stage.dataset.loading='false';stage.dataset.renderer='fallback';onStatus({unavailable:true,label:'3D недоступно · расчёт продолжает работать'});console.warn('ATLAS: model could not load',error);}
+      }catch(error){if(version!==ticket||disposed)return;loading=false;stage.dataset.loading='false';stage.dataset.renderer='fallback';onStatus({unavailable:true,ready:false,vehicle:current?.vehicle,label:'Изображение автомобиля · 3D недоступно'});console.warn('ATLAS: model could not load',error);}
     }else if(!loading)play();
   }
   function syncVisibility(){
@@ -267,7 +272,7 @@ export function createVehicleScene(stage,_images,onStatus){
   canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',pointerUp);
   function keydown(event){if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home'].includes(event.key)||!record||loading)return;event.preventDefault();stopForInspection();if(event.key==='Home'){Object.assign(pose,restPose());invalidate();return;}if(pose.fov>60)Object.assign(pose,entrance());rotate(event.key==='ArrowLeft'?-18:event.key==='ArrowRight'?18:0,event.key==='ArrowUp'?-12:event.key==='ArrowDown'?12:0);}
   stage.addEventListener('keydown',keydown);
-  function contextLost(event){event.preventDefault();lost=true;kill();stage.dataset.renderer='fallback';onStatus({unavailable:true,label:'3D недоступно · расчёт продолжает работать'});}
+  function contextLost(event){event.preventDefault();lost=true;kill();stage.dataset.renderer='fallback';onStatus({unavailable:true,ready:false,vehicle:current?.vehicle,label:'Изображение автомобиля · 3D недоступно'});}
   canvas.addEventListener('webglcontextlost',contextLost);
-  return {update,setVisible,setReduced,toggle,dispose(){disposed=true;ticket++;kill();cancelAnimationFrame(raf);resizeObserver.disconnect();document.removeEventListener('visibilitychange',syncVisibility);stage.removeEventListener('keydown',keydown);cache.forEach(disposeRecord);cache.clear();shadow.geometry.dispose();shadow.material.dispose();shadowTexture.dispose();contact.geometry.dispose();contact.material.dispose();keyLight.shadow.dispose();environment.dispose();renderer.dispose();canvas.remove();}};
+  return {update,setVisible,setReduced,toggle,dispose(){disposed=true;ticket++;kill();cancelAnimationFrame(raf);resizeObserver.disconnect();document.removeEventListener('visibilitychange',syncVisibility);stage.removeEventListener('keydown',keydown);cache.forEach(disposeRecord);cache.clear();shadow.geometry.dispose();shadow.material.dispose();shadowTexture.dispose();contact.geometry.dispose();contact.material.dispose();keyLight.shadow.dispose();environment.dispose();draco.dispose();renderer.dispose();canvas.remove();}};
 }

@@ -60,16 +60,17 @@
 .vehicle-model{filter:none;max-width:none;width:auto;height:100%;inset:0 auto;left:50%;transform:translateX(-50%);transition:opacity .35s ease,visibility .35s}
 .vehicle-canvas{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:grab;touch-action:pan-y;outline:none;transition:opacity .35s ease}
 .vehicle-canvas:active{cursor:grabbing}
-.vehicle-stage[data-renderer=webgl] .vehicle-canvas{opacity:1}
-.vehicle-stage[data-renderer=webgl] .vehicle-model{opacity:0;visibility:hidden}
+/* The poster switches immediately; only a completed first 3D frame may cover it. */
+.vehicle-stage[data-view=three] .vehicle-canvas{opacity:1;visibility:visible;pointer-events:auto}
+.vehicle-stage:not([data-view=three]) .vehicle-canvas{opacity:0;visibility:hidden;pointer-events:none;transition:none}
+.vehicle-stage[data-view=three] .vehicle-model{opacity:0;visibility:hidden}
+.vehicle-stage[data-view=poster] .vehicle-model.is-current{opacity:1;visibility:visible;transition:none}
+.vehicle-stage .vehicle-model:not(.is-current){opacity:0;visibility:hidden;transition:none}
 .vehicle-stage:focus-visible{outline:1px solid #b1d9e5;outline-offset:4px;border-radius:20px}
-.vehicle-stage[data-loading=true] .vehicle-canvas{opacity:0}
-.vehicle-stage[data-loading=true] .vehicle-model{opacity:1;visibility:visible}
-.vehicle-stage[data-renderer=fallback] .vehicle-model{opacity:1;visibility:visible}
 .vehicle-stage{aspect-ratio:1.55}
 .model-interaction-hint{position:absolute;left:30px;top:8px;display:flex;align-items:center;gap:7px;font-size:8px;letter-spacing:.03em;color:#73919e;pointer-events:none}
 .model-interaction-hint svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round}
-.vehicle-stage[data-loading=true] .model-interaction-hint,.vehicle-stage[data-renderer=fallback] .model-interaction-hint{visibility:hidden}
+.vehicle-stage:not([data-view=three]) .model-interaction-hint{visibility:hidden}
 .scene-status{position:absolute;bottom:0;left:30px;right:30px;pointer-events:none}
 .scene-status{z-index:3}
 .scene-status-label{color:#a8c7d6;font-size:11px;letter-spacing:.01em}
@@ -122,3 +123,5 @@
 @media(max-width:760px){.model-interaction-hint{left:20px;top:0;font-size:7px}.model-interaction-hint svg{width:15px;height:15px}.vehicle-body{inset:6px 0 20px}}
 
 @media(prefers-reduced-motion:reduce){.vehicle-model{transform:translateX(-50%)!important;transition:none}.vehicle-canvas{transition:none}}
+
+.scene-toolbar button:disabled{cursor:wait;color:#8fa7b5;background:#1b2b37;border-color:#92b4c51a}

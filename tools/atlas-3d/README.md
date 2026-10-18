@@ -23,3 +23,11 @@ The BMW baseline must be regenerated with the current `prepare.mjs`: its window 
 For S65 and X6, `reflection-normals.mjs` applies a bounded spatial bilateral filter offline after the angle-weighted reconstruction. World-space distance and a normal-angle gate prevent smoothing across perpendicular panels. Body positions and silhouette are unchanged. Glazing, BMW wheels and exterior seals bypass simplification. The runtime fixes tyre depth writes and distinguishes roof glazing/lenses from cabin windows. Porsche and GLS binary assets/posters remain unchanged.
 
 Regression tests: `node --test reflection-normals.test.mjs` here, plus the three `atlas/*.test.cjs` suites from the repository root. Visual acceptance includes front, both sides, rear and elevated roof views, with tyres visible throughout rotation.
+
+## v16 deployment format
+
+The deployed renderer now expects Draco models and a local worker decoder. `prepare.mjs` / `optimize.mjs` produce the Meshopt intermediate; do not deploy that intermediate directly. Run `node pack-models.mjs MESHOPT_BASELINE OUTPUT` as the final packaging step for all four models. Use different input/output directories to avoid repeatedly quantizing an already packed asset. The approved v16 baseline is the four GLBs from Git commit `40f457f6746f77d3ac7e4e8291cef2487d1f22a6`; packing them reproduces the committed outputs exactly.
+
+`npm ci` includes pinned `draco3dgltf@1.5.7`. DRACOLoader and decoder files come from Three.js r180; they remain local and include the Draco license. The renderer uses two decoder workers. Poster revision stays 15 because the actual appearance/camera has not changed; model revision is separately defined in `atlas/model-data.js`. UI-only updates must not invalidate unchanged model/poster URLs.
+
+Cache and asset regression checks: `node --test atlas/model-cache.test.mjs atlas/vehicle-assets.test.cjs` from the repository root. Clear only the test origin's cache, or use a fresh local origin, when measuring cold transfers; an ordinary reload intentionally uses persistent model data.
