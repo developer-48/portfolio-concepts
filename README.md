@@ -84,3 +84,5 @@ ATLAS v14: восстановлены нормали кузова и матер�
 ATLAS v15: сглажены отражения S65 и X6, исправлены прозрачность покрышек и стык люка BMW. Панели стекла и линзы фар разделены; исправления нормалей выполняются при подготовке файлов, без дополнительной работы в браузере. [Изменения](ASSETS-V15.md).
 
 ATLAS v16: выбранная машина сразу показывается готовым изображением; 3D и управление появляются после первого готового кадра. Файлы моделей меньше на 14.6–24.5%, распаковка идёт в фоновых потоках, повторные загрузки используют кэш. [Ресурсы и размеры](ASSETS-V16.md).
+
+ATLAS v17: selected-car-only downloads with resumable partial transfers, persistent completed-model cache and retry after a stalled request. Runtime models are 37–46% smaller than v16; paint geometry is retained, detail geometry is reduced and problem glazing/materials are corrected. See `ASSETS-V17.md` and `QA.md`.

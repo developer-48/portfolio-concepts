@@ -31,3 +31,11 @@ The deployed renderer now expects Draco models and a local worker decoder. `prep
 `npm ci` includes pinned `draco3dgltf@1.5.7`. DRACOLoader and decoder files come from Three.js r180; they remain local and include the Draco license. The renderer uses two decoder workers. Poster revision stays 15 because the actual appearance/camera has not changed; model revision is separately defined in `atlas/model-data.js`. UI-only updates must not invalidate unchanged model/poster URLs.
 
 Cache and asset regression checks: `node --test atlas/model-cache.test.mjs atlas/vehicle-assets.test.cjs` from the repository root. Clear only the test origin's cache, or use a fresh local origin, when measuring cold transfers; an ordinary reload intentionally uses persistent model data.
+
+## v17 web assets (current)
+
+Use `node compact-models.mjs INPUT OUTPUT` with the four licensed v15 GLBs from commit `40f457f6746f77d3ac7e4e8291cef2487d1f22a6`. This supersedes the transport-only v16 packing step for the deployed assets. Do not use already simplified v17 files as input. Paint, glass, lenses and tyres bypass simplification; other surfaces use attribute-aware meshoptimizer reduction, with a tighter wheel threshold. `repair-topology.mjs` removes duplicate/degenerate triangles and fixes unambiguously reversed faces without moving vertices. Attribution survives the conversion.
+
+Rebuild the four transparent posters from the current renderer at 1280×640 / reduced motion / restore pose, then encode WebP; keep temporary capture pages outside the commit. Runtime model/poster revision: 17. Model downloads now follow explicit selection; no hover or other-car warmup. See `ASSETS-V17.md` for sizes and loading semantics.
+
+Additional regressions: `node --test atlas/model-download.test.mjs tools/atlas-3d/repair-topology.test.mjs` from the repository root.

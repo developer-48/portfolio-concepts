@@ -1,23 +1,23 @@
 export const VEHICLES=['coupe','sedan','crossover','suv'];
 
-// A class change never discards a partially downloaded model. Returning A → B → A
-// joins A's original request; completed bytes are reused by both prefetch and 3D.
+// Only the selected car may consume bandwidth. The transport retains partial
+// bytes on abort, so returning to a previous selection can resume with HTTP Range.
 export function createModelStore(fetchModel){
- const ready=new Map(),pending=new Map();let warming;
- function request(vehicle,onProgress=()=>{},priority='high'){
+ const ready=new Map(),pending=new Map();let active;
+ function request(vehicle,onProgress=()=>{}){
   if(!VEHICLES.includes(vehicle))return Promise.reject(new Error('Unknown vehicle'));
+  if(active&&active.vehicle!==vehicle){active.controller.abort();active=null;}
   if(ready.has(vehicle)){onProgress(1);return Promise.resolve(ready.get(vehicle));}
-  if(pending.has(vehicle)){const item=pending.get(vehicle);item.listeners.add(onProgress);onProgress(item.progress);return item.promise;}
-  const item={listeners:new Set([onProgress]),progress:0};
-  item.promise=Promise.resolve().then(()=>fetchModel(vehicle,ratio=>{item.progress=ratio;item.listeners.forEach(listener=>listener(ratio));},priority)).then(buffer=>{
-   ready.set(vehicle,buffer);item.progress=1;item.listeners.forEach(listener=>listener(1));return buffer;
-  }).finally(()=>{pending.delete(vehicle);item.listeners.clear();});
+  const existing=pending.get(vehicle);
+  if(existing&&!existing.controller.signal.aborted){existing.listeners.add(onProgress);onProgress(existing.progress);return existing.promise;}
+  const item={vehicle,controller:new AbortController(),listeners:new Set([onProgress]),progress:0};active=item;
+  item.promise=Promise.resolve().then(()=>{
+   item.controller.signal.throwIfAborted();
+   return fetchModel(vehicle,ratio=>{item.progress=ratio;item.listeners.forEach(listener=>listener(ratio));},item.controller.signal);
+  }).then(buffer=>{
+   item.controller.signal.throwIfAborted();ready.set(vehicle,buffer);item.listeners.forEach(listener=>listener(1));return buffer;
+  }).finally(()=>{if(pending.get(vehicle)===item)pending.delete(vehicle);if(active===item)active=null;item.listeners.clear();});
   pending.set(vehicle,item);return item.promise;
  }
- function warm(selected,allowed=()=>true){
-  if(warming)return warming;
-  warming=(async()=>{for(const vehicle of VEHICLES){if(!allowed())break;if(vehicle===selected()||ready.has(vehicle))continue;await request(vehicle,()=>{},'low').catch(()=>{});}})().finally(()=>{warming=null;});
-  return warming;
- }
- return{request,warm};
+ return{request};
 }

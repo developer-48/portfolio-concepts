@@ -6,9 +6,9 @@ const {gunzipSync}=require('node:zlib');
 for(const vehicle of ['coupe','sedan','crossover','suv'])test(`${vehicle}: self-contained 3D geometry, two door rigs and explicit license`,()=>{
  const data=fs.readFileSync(path.join(__dirname,'../assets/atlas-3d',vehicle+'.glb'));
  assert.equal(data.toString('ascii',0,4),'glTF');assert.equal(data.readUInt32LE(4),2);assert.equal(data.readUInt32LE(8),data.length);
- assert.ok(data.length<1.75*1024*1024,'model exceeds geometry budget');
+ assert.ok(data.length<850*1024,'model exceeds geometry budget');
  const packed=fs.readFileSync(path.join(__dirname,'../assets/atlas-3d',vehicle+'.glb.gz'));
- assert.ok(packed.length<1.1*1024*1024,'model exceeds download budget');
+ assert.ok(packed.length<700*1024,'model exceeds download budget');
  assert.deepEqual(gunzipSync(packed),data,'compressed and fallback models must match');
  const poster=fs.readFileSync(path.join(__dirname,'../assets/atlas-3d',vehicle+'-poster.webp'));
  assert.equal(poster.toString('ascii',8,12),'WEBP');assert.ok(poster.length<80000,'poster must be lightweight');
@@ -33,7 +33,7 @@ for(const vehicle of ['coupe','sedan','crossover','suv'])test(`${vehicle}: self-
  for(const s of ['paint','interior','glass'])assert.ok(surfaces.has(s),`missing ${s} geometry`);
  for(const resource of [...gltf.buffers,...(gltf.images||[])])assert.equal(resource.uri,undefined,'all resources must be embedded');
  const triangles=gltf.meshes.flatMap(m=>m.primitives).reduce((n,p)=>n+gltf.accessors[p.indices].count/3,0);
- assert.ok(triangles>20000&&triangles<190000,`unexpected geometry budget: ${triangles}`);
+ assert.ok(triangles>20000&&triangles<115000,`unexpected geometry budget: ${triangles}`);
 });
 
 test('the decoder is local and ships its license',()=>{

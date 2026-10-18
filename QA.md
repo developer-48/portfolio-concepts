@@ -177,3 +177,13 @@
 - All 12 class/program combinations checked with reduced motion: correct model; exterior doors 0.000, cabin doors 1.080. Ordinary cabin → exterior transitions and model switching work. Porsche, S65, BMW and GLS render through the local Draco loader; approved appearance, materials and door rigs are retained.
 - 320 px mobile viewport: all four posters ready, S65 rendered, document scrollWidth=innerWidth=320. No horizontal overflow. Browser logs clean in the final scenarios. Physical phones were not tested.
 - Slow-network proof screenshot saved outside the repository as `outputs/screenshots/v16-instant-preview.png`. Network/media/viewport overrides are cleared after verification. No QA helper or browser artifact is deployed.
+
+## ATLAS v17 — 2026-10-18
+
+- Investigated the user's actual Chrome tab: v16 resource timing recorded simultaneous coupe, crossover and sedan transfers. BMW download 18,676ms and S65 20,219ms. These network observations explain contention but do not reproduce the reported 1.5–2 minute delay in full.
+- 24 Node tests pass: pricing, treatment state, local licensed assets, selected-request cancellation, rapid A→B→A, cached selection, interrupted Range resumption, full-response fallback, stalled/truncated/misaligned responses, surface winding/deduplication and normals.
+- Chrome local selected-BMW test with 1Mbit/s and 150ms latency, cold model and already initialized renderer: download 4,633ms; decode 64ms; compile 104ms; total selected-model preparation 4,803ms. Correct static BMW image remained visible during the wait. Network trace contains one car request during this selection. This is not a full cold-page timing or a promise for every network/device.
+- All 12 vehicle/program combinations checked under reduced motion: correct model, no loading state left over, doors 0.000 for exterior treatments and 1.080 for interior. Chrome error/warning log clean in these scenarios.
+- Visual inspection of front/side and elevated opposite-side views, opened front doors and glazing. All four posters captured from the final renderer. Geometry simplification excludes paint and glazing; source models remain web assets with limited original interior/detail fidelity.
+- Normal-motion mobile check at 320px: document width equals viewport width, no horizontal overflow, model interaction and treatment transitions retained. No physical-device run was performed.
+- Forced model-request failure: correct poster stays visible, enabled «Загрузить 3D» retry appears; after removing the test block, retry reaches the correct GLS model. The expected blocked-request warning is limited to that fault-injection scenario.
