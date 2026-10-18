@@ -11,7 +11,7 @@
   function renderService(key){
     const item=services[key]; if(!item||!$('#a-service-panel'))return;
     document.querySelectorAll('[data-service]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.service===key)));
-    $('#a-service-panel').innerHTML=`<div class="service-image"><img src="${item.image}" alt="${item.alt}" width="1536" height="1024"><span>${item.caption}</span></div><div class="service-description"><h3>${item.title}</h3><p>${item.text}</p><ul>${item.items.map(text=>`<li>${icon('check')}${text}</li>`).join('')}</ul><div class="service-facts"><div><small>Демонстрационная цена</small><b>от ${money(item.price)}</b></div><div><small>Ориентир по времени</small><b>${item.time}</b></div></div><a class="a-button secondary" href="${item.href}">Разобраться в услуге<span>${icon('layers')}</span></a></div>`;
+    $('#a-service-panel').innerHTML=`<div class="service-image"><img src="${item.image}" alt="${item.alt}" width="1536" height="1024" loading="lazy" fetchpriority="low"><span>${item.caption}</span></div><div class="service-description"><h3>${item.title}</h3><p>${item.text}</p><ul>${item.items.map(text=>`<li>${icon('check')}${text}</li>`).join('')}</ul><div class="service-facts"><div><small>Демонстрационная цена</small><b>от ${money(item.price)}</b></div><div><small>Ориентир по времени</small><b>${item.time}</b></div></div><a class="a-button secondary" href="${item.href}">Разобраться в услуге<span>${icon('layers')}</span></a></div>`;
     if(window.gsap&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
       const photo=$('#a-service-panel .service-image img');
       gsap.fromTo(photo,{opacity:.35,scale:1.035},{opacity:1,scale:1,duration:.7,ease:'power2.out'});

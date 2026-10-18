@@ -28,3 +28,7 @@ Only the selected model downloads. Hover downloads and automatic background down
 A new selection aborts the obsolete network transfer. Received bytes stay in memory. Returning to that car sends `Range` and `If-Range` when an ETag and byte-range support were supplied; a server returning a full 200 response replaces the partial bytes safely. GitHub Pages was verified to return 206 with an ETag and `Accept-Ranges: bytes` for a model. Completed downloads remain in the page cache and persistent Cache Storage (`atlas-models-v17`). HTTP errors, truncated/misaligned bodies and 15 seconds without network progress do not leave an endless loading indicator: the static image remains and a retry control becomes available.
 
 Related implementation references: [meshoptimizer simplifier](https://github.com/zeux/meshoptimizer/blob/master/js/README.md#simplifier), [glTF Transform simplification](https://gltf-transform.dev/modules/functions/functions/simplify).
+
+### First-scene priority follow-up
+
+The page preloads the renderer and local Draco decoder at High priority from its head. Service/process/interior photographs are lazy and Low priority. This removes the previous low-priority renderer request competing with offscreen photographs. Controller and page script revision: 17.1; model, poster and renderer revision remain 17, preserving the cache for unchanged model bytes.

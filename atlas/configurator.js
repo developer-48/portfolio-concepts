@@ -9,7 +9,7 @@
   const vehicles={coupe:['Купе','Porsche 911 GT3 RS','01'],sedan:['Седан','Mercedes-Benz S 65','02'],crossover:['Кроссовер','BMW X6 M','03'],suv:['Большой SUV','Mercedes-Benz GLS','04']};
   const descriptions={restore:'Полировка кузова и нанесение защитного состава.',protect:'Плёнка на переднюю часть кузова и зеркала.',refresh:'Деликатная очистка кожи, текстиля и деталей салона.'};
   const names={glass:'Стёкла',wheels:'Диски',interior:'Салон'};
-  let engine,current,loading,transport,primed=false,visible=false,unavailable=false,ready=false,lastPlayback='',lastProgress=-1;
+  let engine,current,loading,transport,primed=!!document.querySelector('link[rel="modulepreload"][href*="vehicle-scene"]'),visible=false,unavailable=false,ready=false,lastPlayback='',lastProgress=-1;
   const playIcon='<path d="m8 5 11 7-11 7V5Z"/>',pauseIcon='<path d="M9 5v14M15 5v14"/>';
   const mayPrefetch=()=>!document.hidden&&!navigator.connection?.saveData&&!/^(slow-)?2g$/.test(navigator.connection?.effectiveType||'');
   function showReady(value){
@@ -33,7 +33,7 @@
   }
   function prepare(){
     transport??=import('./model-data.js?v=17');
-    if(!primed){const link=document.createElement('link');link.rel='modulepreload';link.href='./vehicle-scene.min.js?v=17';link.fetchPriority='low';document.head.append(link);primed=true;}
+    if(!primed){const link=document.createElement('link');link.rel='modulepreload';link.href='./vehicle-scene.min.js?v=17';link.fetchPriority='high';document.head.append(link);primed=true;}
     transport.then(({requestModel})=>requestModel(current?.vehicle||'coupe')).catch(()=>{});
   }
   const afterPaint=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
