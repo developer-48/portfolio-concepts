@@ -30,3 +30,11 @@ Only S65, X6 and GLS model/preview URLs change to revision 19. Porsche remains r
 ## Porsche protection
 
 Porsche GLB, gzip and poster hashes are unchanged and asserted in `atlas/vehicle-assets.test.cjs`. The previous Porsche material branch, scene lighting, effects and camera path are retained. A same-browser 1280×640 comparison against the previous compiled renderer produced zero changed pixel channels.
+
+## v19.1 — delivery follow-up
+
+The live GitHub Pages connection transferred the three gzip files in 11.2–18.0 seconds, with only 0.24–0.35 seconds spent decoding/compiling. An identical BMW gzip fetched through jsDelivr in the same browser took 1.497 seconds; SHA-256 matched. The other mirrored binaries were also verified against the committed files.
+
+For the three rebuilt cars only, `model-delivery.mjs` tries the jsDelivr GitHub mirror pinned to source commit `6a868f7e5894e88849637b2d35fad271cd915344`. A failed request or 3.5 seconds without progress falls back to the canonical Pages URL. Changing selection aborts the request without starting an obsolete fallback. Only one route transfers at a time. Completed buffers use the same canonical cache keys, so existing v19 downloads stay usable. Local development remains local. Porsche's URL, cache and download path are untouched.
+
+The CDN receives only requests for already public, licensed binary model files. Renderer, application scripts and decoder remain hosted with the site. [jsDelivr's documented GitHub delivery](https://github.com/jsdelivr/jsdelivr#github) supports commit-pinned paths; the site keeps its same-origin fallback independently of CDN availability.

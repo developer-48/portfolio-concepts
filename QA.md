@@ -207,3 +207,10 @@
 - Cold selected-model test on localhost, Chrome network emulation 4 Mbit/s / 100ms: S65 2626ms, BMW 3010ms, GLS 2703ms to interactive. Download portions: 2367/2782/2521ms; decoding: 157/116/114ms; shader compilation: 98/110/65ms. These timings precede the last reflection-normal refinement (same topology/materials, final payloads 0.4–0.6% smaller). The selected, fully decoded preview is already visible during transfer. Cached BMW switch measured 8ms in the same page.
 - Animation samples are measurements on this Mac, not promises for all GPUs: desktop GLS interior 461 frame intervals, none over 34ms, maximum 27.6ms; desktop GLS protection 284 intervals, none over 34ms, maximum 26.5ms. Mobile viewport S65 interior: 463 intervals, two over 34ms, maximum 56.7ms. Occasional frame delays remain possible; physical mobile devices and Safari were not tested.
 - Test cache changes were confined to rebuilt vehicles on the localhost origin. Network/media/viewport overrides were reset. Temporary preview/diagnostic pages and screenshots are excluded from the publication commit.
+
+### v19.1 — published-network diagnosis and alternate delivery
+
+- Published v19 hashes for all three gzip models and the renderer match local outputs; Pages deployment succeeded for `6a868f7`.
+- Real Pages selected-model measurements: S65 11.541s, BMW 18.291s, GLS 17.495s to interactive; transfer dominates. BMW cached switching is 4ms. S65/BMW were tested with a 4 Mbit/s ceiling; GLS was tested after removing throttling. This supersedes any interpretation of localhost measurements as real-world first-load latency.
+- Same-browser identical BMW bytes from the commit-pinned jsDelivr route: 1.497s, SHA-256 matched. All three CDN payloads verified against the committed gzip files. New delivery tests cover preferred route, origin fallback, cancellation without an obsolete retry, and Porsche/local-development bypass. The combined suite now has 36 checks.
+- The application update is limited to delivery selection and module revision 19.1. Model/poster bytes and canonical v19 cache keys remain unchanged.
