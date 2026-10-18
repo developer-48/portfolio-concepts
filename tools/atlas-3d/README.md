@@ -39,3 +39,11 @@ Use `node compact-models.mjs INPUT OUTPUT` with the four licensed v15 GLBs from 
 Rebuild the four transparent posters from the current renderer at 1280×640 / reduced motion / restore pose, then encode WebP; keep temporary capture pages outside the commit. Runtime model/poster revision: 17. Model downloads now follow explicit selection; no hover or other-car warmup. See `ASSETS-V17.md` for sizes and loading semantics.
 
 Additional regressions: `node --test atlas/model-download.test.mjs tools/atlas-3d/repair-topology.test.mjs` from the repository root.
+
+## v18 BMW cabin repair
+
+`node repair-bmw-cabin.mjs V17_CROSSOVER.glb OUTPUT.glb` adds missing door returns/backing, a closed floor beneath the cabin and two seat plinths. Use the deployed v17 BMW from commit `e300c685c20652990a3cb25cb681d3d2e7e4c6f6` as input. The tool rejects double application. Other vehicles do not pass through this tool.
+
+The two door liners follow the actual painted-skin perimeter, stop below the glazing and belong to their respective hinges. The floor stops before the wheel wells; floor/seat bases have both bottom and side faces. Newly added geometry has creased normals. Existing exterior/interior geometry and textures are retained, with the same Draco settings and attribution. No extra runtime repair or texture download is needed. BMW gzip grows from 556,243 to 560,194 bytes (+0.71%). Its URL revision is 18; the other three model URLs and persistent v17 cache remain unchanged.
+
+`node --test repair-bmw-cabin.test.mjs` verifies closed shells, rim-to-skin alignment, hinge ownership, glazing/wheel-well clearance and under-seat ray coverage on the decoded deployed asset.

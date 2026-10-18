@@ -4,7 +4,7 @@ const revision=17,cacheName=`atlas-models-v${revision}`,download=createModelDown
 let storage;
 const store=createModelStore(async(vehicle,onProgress,signal)=>{
  const compressed=typeof DecompressionStream!=='undefined';
- const url=new URL(`../assets/atlas-3d/${vehicle}.glb${compressed?'.gz':''}?v=${revision}`,import.meta.url).href;
+ const url=new URL(`../assets/atlas-3d/${vehicle}.glb${compressed?'.gz':''}?v=${vehicle==='crossover'?18:revision}`,import.meta.url).href;
  storage??=Promise.resolve().then(()=>typeof caches!=='undefined'?caches.open(cacheName):null).catch(()=>null);
  const cache=await storage;
  let response=await cache?.match(url).catch(()=>null);

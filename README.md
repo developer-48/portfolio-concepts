@@ -86,3 +86,5 @@ ATLAS v15: сглажены отражения S65 и X6, исправлены �
 ATLAS v16: выбранная машина сразу показывается готовым изображением; 3D и управление появляются после первого готового кадра. Файлы моделей меньше на 14.6–24.5%, распаковка идёт в фоновых потоках, повторные загрузки используют кэш. [Ресурсы и размеры](ASSETS-V16.md).
 
 ATLAS v17: selected-car-only downloads with resumable partial transfers, persistent completed-model cache and retry after a stalled request. Runtime models are 37–46% smaller than v16; paint geometry is retained, detail geometry is reduced and problem glazing/materials are corrected. See `ASSETS-V17.md` and `QA.md`.
+
+ATLAS v18: BMW door shells and under-seat foundations are closed. BMW-only geometry change; download +3,951 bytes. Other vehicle assets, loading behavior and poster images are retained. See `tools/atlas-3d/README.md`.

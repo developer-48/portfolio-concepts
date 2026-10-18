@@ -1,7 +1,7 @@
 import * as THREE from '../shared/three/three.module.min.js';
 import {GLTFLoader} from '../shared/three/GLTFLoader.js';
 import {DRACOLoader} from '../shared/three/DRACOLoader.js';
-import {requestModel} from './model-data.js?v=17';
+import {requestModel} from './model-data.js?v=18';
 
 import {resolveVisualEffect} from './visual-state.mjs';
 
