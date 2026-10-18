@@ -20,6 +20,14 @@ for(const vehicle of ['coupe','sedan','crossover','suv'])test(`${vehicle}: self-
   assert.ok(door.translation[2]>.5,'door hinge must be at the front');
   assert.equal(Math.sign(door.translation[0]),name==='DoorLeft'?1:-1);
  }
+ if(vehicle==='crossover'){
+  const roof=gltf.nodes.filter(n=>n.extras?.surface==='roof-glass');
+  assert.equal(roof.length,2,'panoramic roof panes must be separate from windows');
+  assert.ok(gltf.nodes.some(n=>n.extras?.surface==='rear-lens'),'rear lenses must retain their own material');
+  const tire=gltf.materials.find(m=>/tires/i.test(m.name));
+  assert.ok(tire,'tire material must be present');
+  assert.equal(tire.alphaMode||'OPAQUE','OPAQUE','tires must write depth instead of disappearing behind body panels');
+ }
  const surfaces=new Set(gltf.nodes.map(n=>n.extras?.surface));
  for(const s of ['paint','interior','glass'])assert.ok(surfaces.has(s),`missing ${s} geometry`);
  for(const resource of [...gltf.buffers,...(gltf.images||[])])assert.equal(resource.uri,undefined,'all resources must be embedded');

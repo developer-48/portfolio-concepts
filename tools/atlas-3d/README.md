@@ -14,3 +14,12 @@ Meshopt uses 14-bit positions. Its `high` mode stores normals using its built-in
 The transparent 1280×640 posters are captures of the actual renderer in default `restore` pose with reduced motion and no UI. Rebuild only affected posters when materials change; retain the same vertical field of view. QA screenshots and temporary rendering helpers do not belong in deployment.
 
 Authors and CC BY 4.0 attribution: `../../ASSETS-V12.md` and `../../atlas/model-credits.html`.
+
+## v15 reflection and glazing repair
+
+Rebuild only the affected vehicles with `node optimize.mjs BASELINE OUTPUT sedan crossover`.
+The BMW baseline must be regenerated with the current `prepare.mjs`: its window panes, roof panes and front/rear lenses are separate surfaces. Tyres are opaque in the asset itself. The two roof panes share a continuous curvature normal field to remove the source bevel's bright zigzag seam; their positions are retained.
+
+For S65 and X6, `reflection-normals.mjs` applies a bounded spatial bilateral filter offline after the angle-weighted reconstruction. World-space distance and a normal-angle gate prevent smoothing across perpendicular panels. Body positions and silhouette are unchanged. Glazing, BMW wheels and exterior seals bypass simplification. The runtime fixes tyre depth writes and distinguishes roof glazing/lenses from cabin windows. Porsche and GLS binary assets/posters remain unchanged.
+
+Regression tests: `node --test reflection-normals.test.mjs` here, plus the three `atlas/*.test.cjs` suites from the repository root. Visual acceptance includes front, both sides, rear and elevated roof views, with tyres visible throughout rotation.

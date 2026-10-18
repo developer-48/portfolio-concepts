@@ -11,7 +11,7 @@ export function requestModel(vehicle,onProgress=()=>{}){
   }
   const controller=new AbortController(),item={controller,listeners:new Set([onProgress]),progress:0};
   const compressed=typeof DecompressionStream!=='undefined';
-  const url=new URL(`../assets/atlas-3d/${vehicle}.glb${compressed?'.gz':''}?v=14`,import.meta.url);
+  const url=new URL(`../assets/atlas-3d/${vehicle}.glb${compressed?'.gz':''}?v=15`,import.meta.url);
   item.promise=(async()=>{
     const response=await fetch(url,{signal:controller.signal});
     if(!response.ok)throw new Error(`Model download failed: ${response.status}`);

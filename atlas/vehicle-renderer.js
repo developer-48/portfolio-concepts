@@ -1,7 +1,7 @@
 import * as THREE from '../shared/three/three.module.min.js';
 import {GLTFLoader} from '../shared/three/GLTFLoader.js';
 import {MeshoptDecoder} from '../shared/three/meshopt_decoder.module.js';
-import {requestModel} from './model-data.js?v=14';
+import {requestModel} from './model-data.js?v=15';
 
 import {resolveVisualEffect} from './visual-state.mjs';
 
@@ -106,16 +106,18 @@ export function createVehicleScene(stage,_images,onStatus){
     else if(/chrome|metal|rim|wheel/i.test(name)){if(/wheels_chrome|GT3RS_black/i.test(name))material.color.multiplyScalar(.5);material.metalness=.85;material.roughness=Math.max(.22,Math.min(.4,material.roughness));}
     else if(/light|glass|screen/i.test(name)){material.metalness=.18;material.roughness=Math.max(.12,material.roughness);}
     else {material.metalness=Math.min(.55,material.metalness);material.roughness=Math.max(.28,material.roughness);}
-    if(surface==='paint')material=new THREE.MeshPhysicalMaterial({color:({coupe:0x06412f,sedan:0x87969e,crossover:0x314c68,suv:0x474d50})[vehicle],metalness:.38,roughness:.34,clearcoat:1,clearcoatRoughness:vehicle==='coupe'?.2:.27});
-    if(surface==='glass'){
+    if(surface==='paint')material=new THREE.MeshPhysicalMaterial({color:({coupe:0x06412f,sedan:0x87969e,crossover:0x314c68,suv:0x474d50})[vehicle],side:['sedan','crossover'].includes(vehicle)?THREE.DoubleSide:THREE.FrontSide,metalness:.38,roughness:.34,clearcoat:1,clearcoatRoughness:vehicle==='coupe'?.2:.27});
+    if(surface==='glass'||surface==='roof-glass'){
       material=material.clone();material.color.set(vehicle==='coupe'?0x718783:0x23333f);material.transparent=true;material.opacity=vehicle==='coupe'?.22:.65;material.depthWrite=false;material.roughness=.085;material.metalness=.25;material.forceSinglePass=true;
+      if(vehicle==='sedan'||vehicle==='crossover'){material.clearcoat=.6;material.clearcoatRoughness=.18;}
+      if(surface==='roof-glass'){material.color.set(0x111d26);material.opacity=1;material.transparent=false;material.depthWrite=true;material.roughness=.16;}
     }
-    if(vehicle!=='coupe'&&/tires|tyres/i.test(name)){material.metalness=0;material.roughness=.88;material.transparent=false;material.opacity=1;material.clearcoat=0;material.normalScale?.set(.35,.35);}
+    if(vehicle!=='coupe'&&/tires|tyres/i.test(name)){material.metalness=0;material.roughness=.88;material.transparent=false;material.depthWrite=true;material.opacity=1;material.clearcoat=0;material.normalScale?.set(.35,.35);}
     if(vehicle!=='coupe'&&/^black_ext/i.test(name)){material.metalness=.12;material.clearcoat=.15;material.roughness=Math.max(.4,material.roughness);}
     if(surface==='trim'){material.color.set(0x12171b);material.metalness=.2;material.roughness=.3;}
-    if(surface==='lens'){material.color.set(0xffffff);material.opacity=.18;material.transparent=true;material.depthWrite=false;material.roughness=.09;material.metalness=0;}
-    if(surface==='mirror'){material.color.set(0xb4bcc2);material.opacity=1;material.transparent=false;material.metalness=1;material.roughness=.12;}
-    const kind={paint:0,interior:2,glass:3,wheels:4}[surface]??5;
+    if(surface==='lens'||surface==='rear-lens'){material.color.set(surface==='rear-lens'?0xc52022:0xffffff);material.opacity=surface==='rear-lens'?.75:.18;material.transparent=true;material.depthWrite=false;material.roughness=.09;material.metalness=0;}
+    if(surface==='mirror'){material.color.set(0xb4bcc2);material.opacity=1;material.transparent=false;material.depthWrite=true;material.metalness=1;material.roughness=.12;}
+    const kind={paint:0,interior:2,glass:3,'roof-glass':3,wheels:4}[surface]??5;
     material.onBeforeCompile=shader=>{
       shader.uniforms.atlasProgress=fx.progress;shader.uniforms.atlasStrength=fx.strength;shader.uniforms.atlasMode=fx.mode;
       shader.vertexShader='varying vec3 vAtlasWorld;\n'+shader.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nvAtlasWorld=(modelMatrix*vec4(transformed,1.0)).xyz;');
@@ -132,7 +134,7 @@ export function createVehicleScene(stage,_images,onStatus){
         outgoingLight += selected*atlasStrength*light*(band*.9+film*(band*.5+grid*.12));
         #include <opaque_fragment>`);
     };
-    material.customProgramCacheKey=()=>`atlas-surface-${kind}-${surface==='glass'&&vehicle!=='coupe'?'tinted':'original'}`;
+    material.customProgramCacheKey=()=>`atlas-surface-${kind}-${surface}-${surface==='glass'&&vehicle!=='coupe'?'tinted':'original'}`;
     return material;
   }
   function disposeRecord(item){
@@ -158,7 +160,7 @@ export function createVehicleScene(stage,_images,onStatus){
       const surface=o.userData.surface||o.parent?.userData.surface||'detail';
       const key=o.material.uuid+'|'+surface;
       if(!materialCache.has(key))materialCache.set(key,decorate(o.material,surface,vehicle));
-      o.material=materialCache.get(key);o.frustumCulled=true;o.castShadow=surface!=='glass'&&!o.material.transparent;o.receiveShadow=surface==='interior';
+      o.material=materialCache.get(key);o.frustumCulled=true;o.castShadow=!['glass','roof-glass'].includes(surface)&&!o.material.transparent;o.receiveShadow=surface==='interior';
     });
     const item={root,left:root.getObjectByName('DoorLeft'),right:root.getObjectByName('DoorRight')};
     if(disposed){disposeRecord(item);return null;}
